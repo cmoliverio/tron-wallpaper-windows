@@ -11,6 +11,9 @@ find_package(glfw3 CONFIG REQUIRED)
 # GLAD
 find_package(glad CONFIG REQUIRED)
 
+# GLM
+find_package(glm CONFIG REQUIRED)
+
 add_executable(tron_wallpaper
     src/main.cpp
     src/shader.cpp
@@ -25,6 +28,7 @@ target_link_libraries(tron_wallpaper
     PRIVATE
         glfw
         glad::glad
+        glm::glm
 )
 
 # MSVC niceties
