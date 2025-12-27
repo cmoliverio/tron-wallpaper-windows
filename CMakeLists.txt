@@ -15,8 +15,9 @@ find_package(glad CONFIG REQUIRED)
 find_package(glm CONFIG REQUIRED)
 
 add_executable(tron_wallpaper
+    WIN32
     src/main.cpp
-    src/shader.cpp
+    # src/shader.cpp
 )
 
 target_include_directories(tron_wallpaper
