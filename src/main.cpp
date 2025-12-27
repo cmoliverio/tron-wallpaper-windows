@@ -13,7 +13,7 @@ HWND find_workerw() {
     }
 
     // Send 0x052C message to spawn a WorkerW behind the desktop icons
-    SendMessageTimeout(progman, 0x052C, 0, 0, SMTO_NORMAL, 1000, nullptr);
+    SendMessageTimeout(progman, 0x052C, 0xD, 0x1, SMTO_NORMAL, 1000, nullptr);
 
     Sleep(1500);
 
@@ -26,18 +26,21 @@ HWND find_workerw() {
         wchar_t cls[256];
         GetClassNameW(top, cls, 256);
 
+        std::cout << "TOP name is " <<  top << std::endl;
+
         // We ONLY care about Progman in this layout
         if (wcscmp(cls, L"Progman") == 0)
         {
             HWND defview =
                 FindWindowExW(top, NULL, L"SHELLDLL_DefView", NULL);
 
-            std::cout << "Progman SHELLDLL_DefView = " << defview << "\n";
+            // std::cout << "Progman SHELLDLL_DefView = " << defview << "\n";
 
             if (defview)
             {
-                HWND workerw =
-                    FindWindowExW(top, NULL, L"WorkerW", NULL);
+                HWND workerw = defview;
+                // HWND workerw =
+                //     FindWindowExW(top, NULL, L"WorkerW", NULL);
 
                 std::cout << "Progman WorkerW = " << workerw << "\n";
 
@@ -70,81 +73,138 @@ int main() {
 
     std::cout << "=== OpenGL Wallpaper Starting ===\n";
 
-    // -------------------------------
-    // Initialize GLFW
-    // -------------------------------
-    if (!glfwInit()) {
-        std::cerr << "Failed to initialize GLFW\n";
-        return -1;
-    }
+    WNDCLASS wc = {};
+    wc.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC | CS_DBLCLKS;
+    wc.lpfnWndProc = DefWindowProc;
+    wc.hInstance = GetModuleHandle(nullptr);
+    wc.lpszClassName = L"MyOpenGLClass";
 
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-    glfwWindowHint(GLFW_DECORATED, GLFW_FALSE);
-    glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
-    glfwWindowHint(GLFW_FLOATING, GLFW_FALSE);
-    glfwWindowHint(GLFW_FOCUSED, GLFW_FALSE);
+    RegisterClass(&wc);
 
-    int screen_width  = GetSystemMetrics(SM_CXSCREEN);
-    int screen_height = GetSystemMetrics(SM_CYSCREEN);
+    HWND hwnd = CreateWindowEx(
+        0,
+        wc.lpszClassName,
+        L"My OpenGL Window",
+        WS_OVERLAPPEDWINDOW,
+        CW_USEDEFAULT, CW_USEDEFAULT, 800, 600,
+        nullptr, nullptr, wc.hInstance, nullptr
+    );
 
-    // -------------------------------
-    // Create GLFW window (not shown yet)
-    // -------------------------------
-    GLFWwindow* window = glfwCreateWindow(screen_width, 
-        screen_height, 
-        "Tron-Wallpaper", 
-        nullptr, 
-        nullptr);
-    if (!window) {
-        std::cerr << "Failed to create GLFW window\n";
-        glfwTerminate();
-        return -1;
-    }
+    HDC hdc = GetDC(hwnd);
 
-    // -------------------------------
-    // Make context current + load GL
-    // -------------------------------
-    glfwMakeContextCurrent(window);
+    PIXELFORMATDESCRIPTOR pfd = {};
+    pfd.nSize = sizeof(pfd);
+    pfd.nVersion = 1;
+    pfd.dwFlags = PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER;
+    pfd.iPixelType = PFD_TYPE_RGBA;
+    pfd.cColorBits = 32;
+    pfd.cDepthBits = 24;
+    pfd.cStencilBits = 8;
+    pfd.iLayerType = PFD_MAIN_PLANE;
 
-    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
-        std::cerr << "Failed to initialize GLAD\n";
-        glfwDestroyWindow(window);
-        glfwTerminate();
-        return -1;
-    }
+    int pf = ChoosePixelFormat(hdc, &pfd);
+    SetPixelFormat(hdc, pf, &pfd);
 
-    // -------------------------------
-    // Get HWND from GLFW
-    // -------------------------------
-    HWND hwnd = glfwGetWin32Window(window);
-    if (!hwnd) {
-        std::cerr << "Failed to get HWND from GLFW window\n";
-        glfwDestroyWindow(window);
-        glfwTerminate();
-        return -1;
-    }
-    std::cout << "Got HWND: " << hwnd << "\n";
+    HGLRC glContext = wglCreateContext(hdc);
+    wglMakeCurrent(hdc, glContext);
+
+    // // -------------------------------
+    // // Initialize GLFW
+    // // -------------------------------
+    // if (!glfwInit()) {
+    //     std::cerr << "Failed to initialize GLFW\n";
+    //     return -1;
+    // }
+
+    // glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    // glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    // glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    // glfwWindowHint(GLFW_DECORATED, GLFW_FALSE);
+    // glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+    // glfwWindowHint(GLFW_FLOATING, GLFW_FALSE);
+    // glfwWindowHint(GLFW_FOCUSED, GLFW_FALSE);
+
+    // int screen_width  = GetSystemMetrics(SM_CXSCREEN);
+    // int screen_height = GetSystemMetrics(SM_CYSCREEN);
+
+    // // -------------------------------
+    // // Create GLFW window (not shown yet)
+    // // -------------------------------
+    // GLFWwindow* window = glfwCreateWindow(screen_width, 
+    //     screen_height, 
+    //     "Tron-Wallpaper", 
+    //     nullptr, 
+    //     nullptr);
+    // if (!window) {
+    //     std::cerr << "Failed to create GLFW window\n";
+    //     glfwTerminate();
+    //     return -1;
+    // }
+
+    // // -------------------------------
+    // // Make context current + load GL
+    // // -------------------------------
+    // glfwMakeContextCurrent(window);
+
+    // if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
+    //     std::cerr << "Failed to initialize GLAD\n";
+    //     glfwDestroyWindow(window);
+    //     glfwTerminate();
+    //     return -1;
+    // }
+
+    // // -------------------------------
+    // // Get HWND from GLFW
+    // // -------------------------------
+    // HWND hwnd = glfwGetWin32Window(window);
+    // if (!hwnd) {
+    //     std::cerr << "Failed to get HWND from GLFW window\n";
+    //     glfwDestroyWindow(window);
+    //     glfwTerminate();
+    //     return -1;
+    // }
+    // std::cout << "Got HWND: " << hwnd << "\n";
+
+    // HDC hdc = GetDC(hwnd);
+
+    // Get the current WNDCLASSEX structure for this window's class
+    // WNDCLASSEXW wcex;
+    // wcex.cbSize = sizeof(WNDCLASSEXW);
+    // if (!GetClassInfoExW(GetModuleHandle(nullptr), L"GLFW30", &wcex)) {
+    //     // GLFW uses "GLFW30" as the class name internally
+    //     wcex.style = 0;
+    // }
+
+    // Modify the style to include CS_DBLCLKS
+    // wcex.style |= CS_DBLCLKS;
+
+    // // Re-register the class
+    // SetClassLongPtr(hwnd, GCL_STYLE, wcex.style);
 
     // -------------------------------
     // Find WorkerW behind desktop icons
     // -------------------------------
     HWND workerw = find_workerw();
-    if (!workerw) {
-        std::cerr << "Could not find WorkerW. Running as normal window.\n";
-        ShowWindow(hwnd, SW_SHOW);
-    } else {
+    if (workerw) {
         std::cout << "Found WorkerW: " << workerw << "\n";
+
+        // Get the current style of your window
+        LONG_PTR style = GetWindowLongPtr(hwnd, GWL_STYLE);
+        // Remove border, title bar, etc., make it a child window
+        style &= ~(WS_CAPTION | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_SYSMENU);
+        style |= WS_CHILD;
+        SetWindowLongPtr(hwnd, GWL_STYLE, style);
 
         // -------------------------------
         // Fix window styles for wallpaper mode
         // -------------------------------
-        LONG style = GetWindowLong(hwnd, GWL_STYLE);
-        style = 0x56010000;
-        // style &= ~(WS_POPUP | WS_OVERLAPPEDWINDOW);
-        // style |= WS_CHILD;
-        SetWindowLong(hwnd, GWL_STYLE, style);
+        // LONG style = GetWindowLong(hwnd, GWL_STYLE);
+        // // style = 0x0;
+        // // style &= (WS_CHILDWINDOW | WS_VISIBLE | WS_CLIPCHILDREN | WS_MAXIMIZEBOX);
+        // style = 0x56010000;
+        // // style &= ~(WS_POPUP | WS_OVERLAPPEDWINDOW);
+        // // style |= WS_CHILD;
+        // SetWindowLong(hwnd, GWL_STYLE, style);
 
         LONG exStyle = GetWindowLong(hwnd, GWL_EXSTYLE);
         exStyle = 0x08090080;
@@ -188,6 +248,8 @@ int main() {
         glClear(GL_COLOR_BUFFER_BIT);
 
         glfwSwapBuffers(window);
+        ShowWindow(hwnd, SW_SHOW);
+        UpdateWindow(hwnd);
         Sleep(1);
     }
 
