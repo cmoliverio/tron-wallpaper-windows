@@ -25,12 +25,19 @@ target_include_directories(tron_wallpaper
     ${CMAKE_SOURCE_DIR}/include
 )
 
-target_link_libraries(tron_wallpaper
-    PRIVATE
-        glfw
-        glad::glad
-        glm::glm
+# For Windows
+target_link_libraries(tron_wallpaper 
+    PRIVATE 
+    glad::glad
+    opengl32
 )
+
+# target_link_libraries(tron_wallpaper
+#     PRIVATE
+#         glfw
+#         glad::glad
+#         glm::glm
+# )
 
 # MSVC niceties
 if (MSVC)
