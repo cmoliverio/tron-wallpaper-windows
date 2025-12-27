@@ -1,9 +1,12 @@
-#include <glad/glad.h>  // MUST be included first, before any OpenGL headers
-#include <GLFW/glfw3.h>
-#define GLFW_EXPOSE_NATIVE_WIN32
-#include <GLFW/glfw3native.h>
-#include <windows.h>
+// #include <glad/glad.h>  // MUST be included first, before any OpenGL headers
+// #include <GLFW/glfw3.h>
+// #define GLFW_EXPOSE_NATIVE_WIN32
+// #include <GLFW/glfw3native.h>
+// #include <windows.h>
 #include <iostream>
+#include <windows.h>
+#include <GL/gl.h> // Or your preferred OpenGL headers (glad, glew)
+#pragma comment(lib, "opengl32.lib")
 
 HWND find_workerw() {
     HWND progman = FindWindow("Progman", NULL);
@@ -38,9 +41,10 @@ HWND find_workerw() {
 
             if (defview)
             {
-                HWND workerw = defview;
-                // HWND workerw =
-                //     FindWindowExW(top, NULL, L"WorkerW", NULL);
+                // HWND workerw = defview;
+                HWND workerw =
+                    FindWindowExW(top, NULL, L"WorkerW", NULL);
+                // HWND workerw = progman;
 
                 std::cout << "Progman WorkerW = " << workerw << "\n";
 
@@ -61,10 +65,21 @@ HWND find_workerw() {
         std::cerr << "Could not find the wallpaper WorkerW\n";
     }
 
-    return workerw_ret;
+    return progman;
+
+    // return workerw_ret;
 }
 
 int main() {
+    HWND progman = get_wallpaper_window();
+    HDC hdc= GetDC(progman);
+    for (int i = 0; i < 1000; ++i) {
+        for (int j = 0; j < 1000; ++j) {
+            SetPixel(hdc,i,j,RGB(0,255,0));
+        }
+    }
+    ReleaseDC(progman, hdc);
+
     // Console for debugging
     AllocConsole();
     FILE* fp;
@@ -73,18 +88,20 @@ int main() {
 
     std::cout << "=== OpenGL Wallpaper Starting ===\n";
 
+    LPCSTR className = "MyOpenGLClass";
+
     WNDCLASS wc = {};
-    wc.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC | CS_DBLCLKS;
+    wc.style = CS_DBLCLKS;
     wc.lpfnWndProc = DefWindowProc;
     wc.hInstance = GetModuleHandle(nullptr);
-    wc.lpszClassName = L"MyOpenGLClass";
+    wc.lpszClassName = className;
 
     RegisterClass(&wc);
 
     HWND hwnd = CreateWindowEx(
         0,
         wc.lpszClassName,
-        L"My OpenGL Window",
+        "My OpenGL Window",
         WS_OVERLAPPEDWINDOW,
         CW_USEDEFAULT, CW_USEDEFAULT, 800, 600,
         nullptr, nullptr, wc.hInstance, nullptr
@@ -195,8 +212,17 @@ int main() {
         style |= WS_CHILD;
         SetWindowLongPtr(hwnd, GWL_STYLE, style);
 
+        if (!SetParent(hwnd, workerw)) {
+            std::cerr << "SetParent failed. Error: " << GetLastError() << "\n";
+        }
+
+        // SetWindowPos(hwnd, HWND_BOTTOM, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+
+        int screen_width = GetSystemMetrics(SM_CXSCREEN);
+        int screen_height = GetSystemMetrics(SM_CYSCREEN);
+        SetWindowPos(hwnd, NULL, 0, 0, screen_width, screen_height, SWP_NOZORDER | SWP_NOACTIVATE | SWP_SHOWWINDOW);
         // -------------------------------
-        // Fix window styles for wallpaper mode
+        // Fix windowkk styles for wallpaper mode
         // -------------------------------
         // LONG style = GetWindowLong(hwnd, GWL_STYLE);
         // // style = 0x0;
@@ -206,26 +232,26 @@ int main() {
         // // style |= WS_CHILD;
         // SetWindowLong(hwnd, GWL_STYLE, style);
 
-        LONG exStyle = GetWindowLong(hwnd, GWL_EXSTYLE);
-        exStyle = 0x08090080;
-        // exStyle &= ~(WS_EX_APPWINDOW);
-        SetWindowLong(hwnd, GWL_EXSTYLE, exStyle);
+        // LONG exStyle = GetWindowLong(hwnd, GWL_EXSTYLE);
+        // exStyle = 0x08090080;
+        // // exStyle &= ~(WS_EX_APPWINDOW);
+        // SetWindowLong(hwnd, GWL_EXSTYLE, exStyle);
 
         // -------------------------------
         // Reparent BEFORE showing
-        // -------------------------------
-        if (!SetParent(hwnd, workerw)) {
-            std::cerr << "SetParent failed. Error: " << GetLastError() << "\n";
-        }
+        // // -------------------------------
+        // if (!SetParent(hwnd, workerw)) {
+        //     std::cerr << "SetParent failed. Error: " << GetLastError() << "\n";
+        // }
 
         // -------------------------------
         // Show window inside WorkerW
         // -------------------------------
-        SetWindowPos(hwnd, NULL, 0, 0, screen_width, screen_height,
-                     SWP_NOZORDER | SWP_NOACTIVATE | SWP_SHOWWINDOW);
+        // SetWindowPos(hwnd, NULL, 0, 0, 2560, 1440,
+        //              SWP_NOZORDER | SWP_NOACTIVATE | SWP_SHOWWINDOW);
 
         ShowWindow(hwnd, SW_SHOW);
-        UpdateWindow(hwnd);
+        // UpdateWindow(hwnd);
 
         std::cout << "Wallpaper window attached successfully.\n";
     }
@@ -235,34 +261,60 @@ int main() {
     // -------------------------------
     std::cout << "Entering render loop...\n";
 
-    while (!glfwWindowShouldClose(window)) {
-        glfwPollEvents();
+    MSG msg = {};
+    while (true) {
+        while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
+            if (msg.message == WM_QUIT) break;
+            TranslateMessage(&msg);
+            DispatchMessage(&msg);
+        }
 
-        int w, h;
-        glfwGetFramebufferSize(window, &w, &h);
-        if (w == 0 || h == 0)
-            continue;
+        wglMakeCurrent(hdc, glContext);
+
+        // Get framebuffer size if needed
+        RECT rect;
+        GetClientRect(hwnd, &rect);
+        int w = rect.right - rect.left;
+        int h = rect.bottom - rect.top;
+        if (w == 0 || h == 0) continue;
 
         glViewport(0, 0, w, h);
         glClearColor(0.2f, 0.6f, 1.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
 
-        glfwSwapBuffers(window);
-        ShowWindow(hwnd, SW_SHOW);
-        UpdateWindow(hwnd);
-        Sleep(1);
+        SwapBuffers(hdc);
+        wglMakeCurrent(NULL, NULL);
+        Sleep(16);
     }
 
-    // -------------------------------
-    // Cleanup
-    // -------------------------------
-    glfwDestroyWindow(window);
-    glfwTerminate();
+    // while (!glfwWindowShouldClose(window)) {
+    //     glfwPollEvents();
+
+    //     int w, h;
+    //     glfwGetFramebufferSize(window, &w, &h);
+    //     if (w == 0 || h == 0)
+    //         continue;
+
+    //     glViewport(0, 0, w, h);
+    //     glClearColor(0.2f, 0.6f, 1.0f, 1.0f);
+    //     glClear(GL_COLOR_BUFFER_BIT);
+
+    //     glfwSwapBuffers(window);
+    //     ShowWindow(hwnd, SW_SHOW);
+    //     UpdateWindow(hwnd);
+    //     Sleep(1);
+    // }
+
+    // // -------------------------------
+    // // Cleanup
+    // // -------------------------------
+    // glfwDestroyWindow(window);
+    // glfwTerminate();
 
     std::cout << "Cleanup complete.\n";
     return 0;
 }
 
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int) {
-    return main();
-}
+// int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int) {
+//     return main();
+// }
