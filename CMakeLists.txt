@@ -17,7 +17,7 @@ find_package(glm CONFIG REQUIRED)
 add_executable(tron_wallpaper
     WIN32
     src/main.cpp
-    # src/shader.cpp
+    src/shader.cpp
 )
 
 target_include_directories(tron_wallpaper
@@ -26,18 +26,18 @@ target_include_directories(tron_wallpaper
 )
 
 # For Windows
-target_link_libraries(tron_wallpaper 
-    PRIVATE 
-    glad::glad
-    opengl32
-)
-
-# target_link_libraries(tron_wallpaper
-#     PRIVATE
-#         glfw
-#         glad::glad
-#         glm::glm
+# target_link_libraries(tron_wallpaper 
+#     PRIVATE 
+#     glad::glad
+#     opengl32
 # )
+
+target_link_libraries(tron_wallpaper
+    PRIVATE
+        glfw
+        glad::glad
+        glm::glm
+)
 
 # MSVC niceties
 if (MSVC)
