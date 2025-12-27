@@ -21,6 +21,7 @@ int HEIGHT = 720;
 
 float sqrt_of_2 = std::sqrt(2.0f);
 float sqrt_of_3 = std::sqrt(3.0f);
+float sqrt_of_6 = std::sqrt(6.0f);
 
 float vertices[] = {
     // position x y z                            // colors
@@ -29,12 +30,31 @@ float vertices[] = {
     -sqrt_of_3 / 2.0f, -0.5f, 0.0f,     0.0f, 1.0f, 0.0f
 };
 
-float pyramid[] = {
-    // positions                     // colors 
-    0.0f, 1.0f, 0.0f,                   0.0f, 0.0f, 1.0f,
-    sqrt_of_3 / 2.0f, -0.5f, 0.0f,      1.0f, 0.0f, 0.0f,
-    -sqrt_of_3 / 2.0f, -0.5f, 0.0f,     0.0f, 1.0f, 0.0f
+// float pyramid[] = {
+//     // positions                     // colors 
+//     0.0f, 1.0f, 0.0f,                   0.0f, 0.0f, 1.0f,
+//     sqrt_of_3 / 2.0f, -0.5f, 0.0f,      1.0f, 0.0f, 0.0f,
+//     -sqrt_of_3 / 2.0f, -0.5f, 0.0f,     0.0f, 1.0f, 0.0f
+// };
+
+float pyrdamid_vertices[] = {
+    // x y z 
+    0.0f, 0.0f, 1.0f,
+    2.0f * sqrt_of_2 / 3.0f, 0.0f, -1.0f / 3.0f,
+    -sqrt_of_2 / 3.0f, sqrt_of_6 / 3.0f, -1.0f / 3.0f,
+    -sqrt_of_2 / 3.0f, -sqrt_of_6 / 3.0f, -1.0f / 3.0f,
 };
+
+unsigned int pyramid_indices[] = {
+    // Side faces
+    0, 1, 2,
+    0, 2, 3,
+    0, 3, 1,
+
+    // Base face
+    1, 3, 2
+};
+
 
 static void framebuffer_size_callback(GLFWwindow *, int width, int height)
 {
@@ -81,30 +101,77 @@ int main()
     std::cout << "Renderer: " << glGetString(GL_RENDERER) << "\n";
     std::cout << "OpenGL: " << glGetString(GL_VERSION) << "\n";
 
-    uint32_t VBO;
-    uint32_t VAO;
-    glGenBuffers(1, &VBO);
+    uint32_t VAO, VBO, EBO;
+
     glGenVertexArrays(1, &VAO);
+    glGenBuffers(1, &VBO);
+    glGenBuffers(1, &EBO);
+
+    glBindVertexArray(VAO);
+
+    // Vertex buffer
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glBufferData(GL_ARRAY_BUFFER, 
+        sizeof(pyrdamid_vertices), 
+        pyrdamid_vertices, 
+        GL_STATIC_DRAW);
+
+    // Index buffer
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, 
+        sizeof(pyramid_indices), 
+        pyramid_indices, 
+        GL_STATIC_DRAW);
+
+    // Vertex attribute
+    glVertexAttribPointer(
+        0,                      // location
+        3,                      // vec3
+        GL_FLOAT,
+        GL_FALSE,
+        3 * sizeof(float),
+        (void*)0
+    );
+    glEnableVertexAttribArray(0);
+
+    glBindVertexArray(0);
+
+    // uint32_t VBO;
+    // uint32_t VAO;
+    // glGenBuffers(1, &VBO);
+    // glGenVertexArrays(1, &VAO);
+
+    // glBindVertexArray(VAO);
+    // glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    // glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+    // for(int i = 0; i < 4; i++){
+    //     int first = (i + 0) * (i + 1);
+    //     int second = (i + 1) * (i + 1);
+    //     int third = (i + 2) * (i + 1);
+
+
+    // }
 
     // move trinagle data in there
-    glBindVertexArray(VAO);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+    // glBindVertexArray(VAO);
+    // glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    // glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
-    glVertexAttribPointer(0,
-                          3,
-                          GL_FLOAT,
-                          GL_FALSE,
-                          6 * sizeof(float),
-                          (void *)0);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(1,
-                          3,
-                          GL_FLOAT,
-                          GL_FALSE,
-                          6 * sizeof(float),
-                          (void *)(3 * sizeof(float)));
-    glEnableVertexAttribArray(1);
+    // glVertexAttribPointer(0,
+    //                       3,
+    //                       GL_FLOAT,
+    //                       GL_FALSE,
+    //                       3 * sizeof(float),
+    //                       (void *)0);
+    // glEnableVertexAttribArray(0);
+    // glVertexAttribPointer(1,
+    //                       3,
+    //                       GL_FLOAT,
+    //                       GL_FALSE,
+    //                       3 * sizeof(float),
+    //                       (void *)(3 * sizeof(float)));
+    // glEnableVertexAttribArray(1);
 
     Shader normal_shader("vertex_shader.vert", "fragment_shader.frag");
     normal_shader.use();
@@ -131,8 +198,7 @@ int main()
 
         normal_shader.use();
 
-
-        int32_t viewport_sizes = glGetUniformLocation(
+        viewport_sizes = glGetUniformLocation(
             normal_shader.ID, 
             "viewport_size"
         );
@@ -140,15 +206,22 @@ int main()
             std::cerr << "Did not find viewport size variable" << std::endl;
         glUniform2f(viewport_sizes, (float) WIDTH, (float) HEIGHT);
 
-
-
-        glm::mat4 camera = glm::mat4(1.0f);
         glm::mat4 transform_matrix = glm::mat4(1.0f);
-        // transform_matrix = glm::scale(transform_matrix, glm::vec3(1.0f, 1.0f, 1.0f));
+        transform_matrix = glm::scale(
+            transform_matrix, 
+            glm::vec3(1.0f, 1.0f, 1.0f)
+        );
+        transform_matrix = glm::rotate(
+            transform_matrix,
+            glm::radians(rot_angle),
+            glm::vec3(rot_angle, 0.0f, rot_angle)
+        );
+
         int32_t transform_uniform = glGetUniformLocation(
             normal_shader.ID,
             "transform"
         );
+
         if(transform_uniform == -1) {
             std::cerr << "Did not find a uniform" << std::endl;
         }
@@ -160,19 +233,6 @@ int main()
             glm::radians(rot_angle),
             glm::vec3(0.0f, 0.0f, 1.0f)
         );
-        int32_t cam_transform = glGetUniformLocation(
-            normal_shader.ID,
-            "camera"
-        );
-        if(cam_transform == -1) {
-                std::cerr << "Did not find a uniform" << std::endl;
-        }
-        glUniformMatrix4fv(
-            cam_transform, 
-            1, 
-            GL_FALSE, 
-            glm::value_ptr(camera)
-        );
         glUniformMatrix4fv(
             transform_uniform, 
             1, 
@@ -181,12 +241,13 @@ int main()
         );
 
         glBindVertexArray(VAO);
-        glDrawArrays(GL_TRIANGLES, 0, 3);
+        // glDrawArrays(GL_TRIANGLES, 0, 3);
+        glDrawElements(GL_TRIANGLES, 12, GL_UNSIGNED_INT, 0);
 
         glfwSwapBuffers(window);
         glfwPollEvents();
 
-        rot_angle += 0.05f;
+        rot_angle += 0.1f;
     }
 
     glfwDestroyWindow(window);

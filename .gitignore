@@ -3,3 +3,4 @@ source_me.sh
 *.dll
 *.exe
 *.pdb
+source*.sh

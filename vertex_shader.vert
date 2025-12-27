@@ -1,9 +1,9 @@
 #version 330 core
 layout (location = 0) in vec3 aPos;
-layout (location = 1) in vec3 aColor;
+// layout (location = 1) in vec3 aColor;
 
 
-uniform mat4 camera;
+// uniform mat4 camera;
 uniform mat4 transform;
 
 uniform vec2 viewport_size;
@@ -18,7 +18,7 @@ void main()
     float ratio = viewport_size.x / viewport_size.y;
     // aPos.xy = x_y_pos.xy;
 
-    mat4 something = camera;
+    // mat4 something = camera;
 
     gl_Position = transform * vec4(aPos.x, aPos.y, aPos.z, 1.0);
 
@@ -30,5 +30,7 @@ void main()
         gl_Position.y *= ratio;
     }
 
-    theColor = aColor;
+    theColor = vec3(gl_Position.x + gl_Position.y, 
+        gl_Position.y + gl_Position.z, 
+        gl_Position.z);
 }
