@@ -5,24 +5,41 @@
 #include <fstream>
 #include <sstream>
 #include <iostream>
+#include <cmath>
+
+// graphics library mathematics :) 
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
 
 // #include <shader_utils.hpp>
 #include "shader.hpp"
 
-float vertices[] = {
-    // position x y z,      colors
-    0.5f, -0.5f, 0.0f,      1.0f, 0.0f, 0.0f,
-    -0.5f, -0.5f, 0.0f,     0.0f, 1.0f, 0.0f,
-    0.0f, 0.5f, 0.0f,      0.0f, 0.0f, 1.0f};
+// #define WIDTH 960
+int WIDTH = 1280;
+int HEIGHT = 720;
 
-float second_vertices[] = {
-    -1.0f, 0.0f, 0.0f,    1.0f, 0.0f, 0.0f,
-    0.0f, 0.01f, 0.0f,     0.0f, 1.0f, 0.0f,
-    -1.0f, 1.0f, 0.0f,    0.0f, 0.0f, 1.0f
+float sqrt_of_2 = std::sqrt(2.0f);
+float sqrt_of_3 = std::sqrt(3.0f);
+
+float vertices[] = {
+    // position x y z                            // colors
+    0.0f, 1.0f, 0.0f,                               0.0f, 0.0f, 1.0f,
+    sqrt_of_3 / 2.0f, -0.5f, 0.0f,      1.0f, 0.0f, 0.0f,
+    -sqrt_of_3 / 2.0f, -0.5f, 0.0f,     0.0f, 1.0f, 0.0f
+};
+
+float pyramid[] = {
+    // positions                     // colors 
+    0.0f, 1.0f, 0.0f,                   0.0f, 0.0f, 1.0f,
+    sqrt_of_3 / 2.0f, -0.5f, 0.0f,      1.0f, 0.0f, 0.0f,
+    -sqrt_of_3 / 2.0f, -0.5f, 0.0f,     0.0f, 1.0f, 0.0f
 };
 
 static void framebuffer_size_callback(GLFWwindow *, int width, int height)
 {
+    WIDTH = width;
+    HEIGHT = height;
     glViewport(0, 0, width, height);
 }
 
@@ -40,7 +57,7 @@ int main()
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
     GLFWwindow *window = glfwCreateWindow(
-        960, 720,
+        WIDTH, HEIGHT,
         "OpenGL Windows App",
         nullptr,
         nullptr);
@@ -89,36 +106,19 @@ int main()
                           (void *)(3 * sizeof(float)));
     glEnableVertexAttribArray(1);
 
-    uint32_t VBO2;
-    uint32_t VAO2;
-
-    glGenBuffers(1, &VBO2);
-    glGenVertexArrays(1, &VAO2);
-
-    glBindVertexArray(VAO2);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO2);
-    glBufferData(GL_ARRAY_BUFFER,
-                 sizeof(second_vertices),
-                 second_vertices,
-                 GL_STATIC_DRAW);
-
-    glVertexAttribPointer(0,
-                          3,
-                          GL_FLOAT,
-                          GL_FALSE,
-                          6 * sizeof(float),
-                          (void *)0);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(1,
-                          3,
-                          GL_FLOAT,
-                          GL_FALSE,
-                          6 * sizeof(float),
-                          (void *)(3 * sizeof(float)));
-    glEnableVertexAttribArray(1);
-
     Shader normal_shader("vertex_shader.vert", "fragment_shader.frag");
-    Shader shader_2("vertex_shader2.vert", "yellow_fragment_shader.frag");
+    normal_shader.use();
+    
+    int32_t viewport_sizes = glGetUniformLocation(
+        normal_shader.ID, 
+        "viewport_size"
+    );
+    if(viewport_sizes == -1)
+        std::cerr << "Did not find viewport size variable" << std::endl;
+
+    glUniform2f(viewport_sizes, (float) WIDTH, (float) HEIGHT);
+
+    float rot_angle = 0.0f;
 
     // Render loop
     while (!glfwWindowShouldClose(window))
@@ -129,18 +129,64 @@ int main()
         glClearColor(0.08f, 0.10f, 0.13f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
 
-        shader_2.use();
+        normal_shader.use();
+
+
+        int32_t viewport_sizes = glGetUniformLocation(
+            normal_shader.ID, 
+            "viewport_size"
+        );
+        if(viewport_sizes == -1)
+            std::cerr << "Did not find viewport size variable" << std::endl;
+        glUniform2f(viewport_sizes, (float) WIDTH, (float) HEIGHT);
+
+
+
+        glm::mat4 camera = glm::mat4(1.0f);
+        glm::mat4 transform_matrix = glm::mat4(1.0f);
+        // transform_matrix = glm::scale(transform_matrix, glm::vec3(1.0f, 1.0f, 1.0f));
+        int32_t transform_uniform = glGetUniformLocation(
+            normal_shader.ID,
+            "transform"
+        );
+        if(transform_uniform == -1) {
+            std::cerr << "Did not find a uniform" << std::endl;
+        }
+        transform_matrix = glm::scale(
+            transform_matrix, glm::vec3(0.75f, 0.75f, 0.75f)
+        );
+        transform_matrix = glm::rotate(
+            transform_matrix, 
+            glm::radians(rot_angle),
+            glm::vec3(0.0f, 0.0f, 1.0f)
+        );
+        int32_t cam_transform = glGetUniformLocation(
+            normal_shader.ID,
+            "camera"
+        );
+        if(cam_transform == -1) {
+                std::cerr << "Did not find a uniform" << std::endl;
+        }
+        glUniformMatrix4fv(
+            cam_transform, 
+            1, 
+            GL_FALSE, 
+            glm::value_ptr(camera)
+        );
+        glUniformMatrix4fv(
+            transform_uniform, 
+            1, 
+            GL_FALSE, 
+            glm::value_ptr(transform_matrix)
+        );
+
         glBindVertexArray(VAO);
         glDrawArrays(GL_TRIANGLES, 0, 3);
 
-        normal_shader.use();
-        // glUseProgram(normal_shader.get());
-        glBindVertexArray(VAO2);
-        glDrawArrays(GL_TRIANGLES, 0, 3);
-
-
         glfwSwapBuffers(window);
         glfwPollEvents();
+
+        rot_angle += 0.05f;
     }
 
     glfwDestroyWindow(window);
