@@ -12,25 +12,75 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     }
 }
 
-// Find the WorkerW window behind the desktop icons
-HWND GetWorkerW() {
-    HWND progman = FindWindow("Progman", nullptr);
+HWND GetWorkerW()
+{
     HWND workerw = nullptr;
 
-    // Send message to Progman to spawn a WorkerW behind icons
-    SendMessageTimeout(progman, 0x052C, 0, 0, SMTO_NORMAL, 1000, nullptr);
+    EnumWindows([](HWND hwnd, LPARAM lParam) -> BOOL
+    {
+        HWND defView = FindWindowEx(
+            hwnd,
+            nullptr,
+            "SHELLDLL_DefView",
+            nullptr
+        );
 
-    // Enumerate windows to find the WorkerW
-    EnumWindows([](HWND topWnd, LPARAM lParam) -> BOOL {
-        HWND shellView = FindWindowEx(topWnd, nullptr, "SHELLDLL_DefView", nullptr);
-        if (shellView) {
-            HWND* pWorker = (HWND*)lParam;
-            *pWorker = FindWindowEx(nullptr, topWnd, "WorkerW", nullptr);
+        if (defView)
+        {
+            // WorkerW is *sibling* of the one containing DefView
+            HWND next = FindWindowEx(
+                nullptr,
+                hwnd,
+                "WorkerW",
+                nullptr
+            );
+
+            if (next)
+            {
+                *(HWND*)lParam = next;
+                return FALSE;
+            }
         }
         return TRUE;
     }, (LPARAM)&workerw);
 
     return workerw;
+}
+
+// Find the WorkerW window behind the desktop icons
+// HWND GetWorkerW() {
+//     HWND progman = FindWindow("Progman", nullptr);
+//     HWND workerw = nullptr;
+
+//     // Send message to Progman to spawn a WorkerW behind icons
+//     SendMessageTimeout(progman, 0x052C, 0, 0, SMTO_NORMAL, 1000, nullptr);
+
+//     // Enumerate windows to find the WorkerW
+//     EnumWindows([](HWND topWnd, LPARAM lParam) -> BOOL {
+//         HWND shellView = FindWindowEx(topWnd, nullptr, "SHELLDLL_DefView", nullptr);
+//         if (shellView) {
+//             HWND* pWorker = (HWND*)lParam;
+//             *pWorker = FindWindowEx(nullptr, topWnd, "WorkerW", nullptr);
+//         }
+//         return TRUE;
+//     }, (LPARAM)&workerw);
+
+//     return workerw;
+// }
+
+void SpawnWorkerW()
+{
+    HWND progman = FindWindow("Progman", nullptr);
+
+    SendMessageTimeout(
+        progman,
+        0x052C,
+        0,
+        0,
+        SMTO_NORMAL,
+        100,
+        nullptr
+    );
 }
 
 int main() {
@@ -53,6 +103,15 @@ int main() {
 
     RegisterClassW(&wc);
 
+    SpawnWorkerW();
+    HWND workerw = GetWorkerW();
+
+    if (!workerw)
+    {
+        MessageBox(nullptr, "WorkerW not found", "Error", MB_ICONERROR);
+        return -1;
+    }
+
     // -------------------------------
     // Create window (borderless, no activate)
     // -------------------------------
@@ -62,25 +121,45 @@ int main() {
     //     return -1;
     // }
 
+    // HWND hwnd = CreateWindowExW(
+    //     WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE,  // hide from Alt+Tab + no activation
+    //     L"MyOpenGLClass",
+    //     L"My OpenGL Wallpaper",
+    //     WS_POPUP | WS_VISIBLE,
+    //     0, 0, GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN),
+    //     NULL,  // parent to WorkerW
+    //     nullptr,
+    //     hInstance,
+    //     nullptr
+    // );
+
+    int width  = GetSystemMetrics(SM_CXSCREEN);
+    int height = GetSystemMetrics(SM_CYSCREEN);
+
     HWND hwnd = CreateWindowExW(
-        WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE,  // hide from Alt+Tab + no activation
+        WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW,
         L"MyOpenGLClass",
-        L"My OpenGL Wallpaper",
-        WS_POPUP | WS_VISIBLE,
-        0, 0, GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN),
-        NULL,  // parent to WorkerW
+        L"OpenGL Wallpaper",
+        WS_CHILD | WS_VISIBLE,   // 🔥 NOT WS_POPUP
+        0, 0,
+        width, height,
+        workerw,                 // 🔥 REAL parent
         nullptr,
         hInstance,
         nullptr
     );
 
+
     // Push the window to the bottom so it never covers other windows
-    SetWindowPos(
-        hwnd,
-        HWND_BOTTOM,
-        0, 0, 0, 0,
-        SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOREDRAW
-    );
+    // SetWindowPos(
+    //     hwnd,
+    //     HWND_BOTTOM,
+    //     0, 
+    //     0, 
+    //     width, 
+    //     height,
+    //     SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOREDRAW
+    // );
 
     HDC hdc = GetDC(hwnd);
 
@@ -112,6 +191,13 @@ int main() {
             TranslateMessage(&msg);
             DispatchMessage(&msg);
         }
+
+        // SetWindowPos(
+        //     hwnd,
+        //     HWND_BOTTOM,
+        //     0, 0, 0, 0,
+        //     SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOREDRAW
+        // );
 
         int w = GetSystemMetrics(SM_CXSCREEN);
         int h = GetSystemMetrics(SM_CYSCREEN);
