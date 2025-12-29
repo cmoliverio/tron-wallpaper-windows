@@ -30,13 +30,6 @@ float vertices[] = {
     -sqrt_of_3 / 2.0f, -0.5f, 0.0f,     0.0f, 1.0f, 0.0f
 };
 
-// float pyramid[] = {
-//     // positions                     // colors 
-//     0.0f, 1.0f, 0.0f,                   0.0f, 0.0f, 1.0f,
-//     sqrt_of_3 / 2.0f, -0.5f, 0.0f,      1.0f, 0.0f, 0.0f,
-//     -sqrt_of_3 / 2.0f, -0.5f, 0.0f,     0.0f, 1.0f, 0.0f
-// };
-
 float pyrdamid_vertices[] = {
     // x y z 
     0.0f, 0.0f, 1.0f,
@@ -136,42 +129,6 @@ int main()
 
     glBindVertexArray(0);
 
-    // uint32_t VBO;
-    // uint32_t VAO;
-    // glGenBuffers(1, &VBO);
-    // glGenVertexArrays(1, &VAO);
-
-    // glBindVertexArray(VAO);
-    // glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    // glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-
-    // for(int i = 0; i < 4; i++){
-    //     int first = (i + 0) * (i + 1);
-    //     int second = (i + 1) * (i + 1);
-    //     int third = (i + 2) * (i + 1);
-
-
-    // }
-
-    // move trinagle data in there
-    // glBindVertexArray(VAO);
-    // glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    // glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-
-    // glVertexAttribPointer(0,
-    //                       3,
-    //                       GL_FLOAT,
-    //                       GL_FALSE,
-    //                       3 * sizeof(float),
-    //                       (void *)0);
-    // glEnableVertexAttribArray(0);
-    // glVertexAttribPointer(1,
-    //                       3,
-    //                       GL_FLOAT,
-    //                       GL_FALSE,
-    //                       3 * sizeof(float),
-    //                       (void *)(3 * sizeof(float)));
-    // glEnableVertexAttribArray(1);
 
     Shader normal_shader("vertex_shader.vert", "fragment_shader.frag");
     normal_shader.use();
@@ -194,51 +151,93 @@ int main()
             glfwSetWindowShouldClose(window, true);
 
         glClearColor(0.08f, 0.10f, 0.13f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         normal_shader.use();
 
-        viewport_sizes = glGetUniformLocation(
-            normal_shader.ID, 
-            "viewport_size"
-        );
-        if(viewport_sizes == -1)
-            std::cerr << "Did not find viewport size variable" << std::endl;
-        glUniform2f(viewport_sizes, (float) WIDTH, (float) HEIGHT);
-
-        glm::mat4 transform_matrix = glm::mat4(1.0f);
-        transform_matrix = glm::scale(
-            transform_matrix, 
-            glm::vec3(1.0f, 1.0f, 1.0f)
-        );
-        transform_matrix = glm::rotate(
-            transform_matrix,
-            glm::radians(rot_angle),
-            glm::vec3(rot_angle, 0.0f, rot_angle)
-        );
-
-        int32_t transform_uniform = glGetUniformLocation(
+        // model
+        int32_t model_loc = glGetUniformLocation(
             normal_shader.ID,
-            "transform"
+            "model"
         );
-
-        if(transform_uniform == -1) {
+        if(model_loc == -1) {
             std::cerr << "Did not find a uniform" << std::endl;
         }
-        transform_matrix = glm::scale(
-            transform_matrix, glm::vec3(0.75f, 0.75f, 0.75f)
+        glm::mat4 model = glm::mat4(1.0f);
+        model = glm::scale(
+            model, glm::vec3(0.75f, 0.75f, 0.75f)
         );
-        transform_matrix = glm::rotate(
-            transform_matrix, 
+        // model = glm::translate(
+        //     model, glm::vec3(1.0f, 0.5f, -1.0f)
+        // model = glm::rotate(
+        //     model, 
+        //     glm::radians(rot_angle),
+        //     glm::vec3(0.0f, 0.0f, 0.0f)
+        // );
+        model = glm::rotate(
+            model, 
             glm::radians(rot_angle),
-            glm::vec3(0.0f, 0.0f, 1.0f)
+            glm::vec3(0.0f, 1.0f, 0.0f)
+        );
+        model = glm::translate(
+            model, glm::vec3(2.0f, 0.0f, 0.0f)
+        );
+        model = glm::rotate(
+            model, 
+            glm::radians(-rot_angle),
+            glm::vec3(0.0f, 1.0f, 0.0f)
+        );
+        model = glm::rotate(
+            model, 
+            glm::radians(-90.0f),
+            glm::vec3(1.0f, 0.0f, 0.0f)
         );
         glUniformMatrix4fv(
-            transform_uniform, 
+            model_loc, 
             1, 
             GL_FALSE, 
-            glm::value_ptr(transform_matrix)
+            glm::value_ptr(model)
         );
+
+        // view 
+        glm::mat4 view = glm::mat4(1.0f);
+        view = glm::translate(view, glm::vec3(0.0f, 0.0f, -3.0f));
+        int32_t view_loc = glGetUniformLocation(
+            normal_shader.ID,
+            "view"
+        );
+        if (view_loc == -1) {
+            std::cerr << "View uniform not found" << std::endl;
+        }
+        glUniformMatrix4fv(
+            view_loc,
+            1,
+            GL_FALSE,
+            glm::value_ptr(view)
+        );
+
+        // projection
+        glm::mat4 projection = glm::perspective(
+            glm::radians(45.0f), 
+            (float)WIDTH / (float)HEIGHT, // not sure what this is tbh
+            0.1f,  // near clipping distance
+            100.0f // far clipping distance
+        );
+        int32_t projection_loc = glGetUniformLocation(
+            normal_shader.ID,
+            "projection"
+        );
+        if (projection_loc == -1) {
+            std::cerr << "Projection uniform not found" << std::endl;
+        }
+        glUniformMatrix4fv(
+            projection_loc,
+            1, 
+            GL_FALSE,
+            glm::value_ptr(projection)
+        );
+
+        glEnable(GL_DEPTH_TEST);
 
         glBindVertexArray(VAO);
         // glDrawArrays(GL_TRIANGLES, 0, 3);
@@ -247,7 +246,7 @@ int main()
         glfwSwapBuffers(window);
         glfwPollEvents();
 
-        rot_angle += 0.1f;
+        rot_angle += 0.05f;
     }
 
     glfwDestroyWindow(window);
