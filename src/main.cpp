@@ -179,7 +179,7 @@ int main()
         {
             // spinAxes[i] = randomUnitAxis();
             tetrahedrons[i].rotate(spin, spinAxes[i]);
-            tetrahedrons[i].draw(normal_shader);
+            tetrahedrons[i].draw(normal_shader, i);
         }
 
         glfwSwapBuffers(window);

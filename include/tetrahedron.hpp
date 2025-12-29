@@ -24,6 +24,7 @@ public:
 
     // Rendering
     void draw(Shader& shader) const;
+    void draw(Shader& shader, int obj_num) const;
 
     // Access if needed
     const glm::mat4& getModelMatrix() const;

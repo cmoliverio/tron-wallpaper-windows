@@ -111,6 +111,24 @@ void Tetrahedron::draw(Shader& shader) const
     int loc = glGetUniformLocation(shader.ID, "model");
     glUniformMatrix4fv(loc, 1, GL_FALSE, glm::value_ptr(model));
 
+    loc = glGetUniformLocation(shader.ID, "number");
+    glUniform1ui(loc, 0);
+
+    glBindVertexArray(VAO);
+    glDrawElements(GL_TRIANGLES, 12, GL_UNSIGNED_INT, nullptr);
+    glBindVertexArray(0);
+}
+
+void Tetrahedron::draw(Shader& shader, int obj_num) const
+{
+    shader.use();
+
+    int loc = glGetUniformLocation(shader.ID, "model");
+    glUniformMatrix4fv(loc, 1, GL_FALSE, glm::value_ptr(model));
+
+    loc = glGetUniformLocation(shader.ID, "obj_num");
+    glUniform1i(loc, obj_num);
+
     glBindVertexArray(VAO);
     glDrawElements(GL_TRIANGLES, 12, GL_UNSIGNED_INT, nullptr);
     glBindVertexArray(0);
