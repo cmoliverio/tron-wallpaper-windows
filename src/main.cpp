@@ -6,6 +6,8 @@
 #include <sstream>
 #include <iostream>
 #include <cmath>
+#include <vector>
+#include <random>
 
 // graphics library mathematics :) 
 #include <glm/glm.hpp>
@@ -14,6 +16,7 @@
 
 // #include <shader_utils.hpp>
 #include "shader.hpp"
+#include "tetrahedron.hpp"
 
 // #define WIDTH 960
 int WIDTH = 1280;
@@ -54,6 +57,24 @@ static void framebuffer_size_callback(GLFWwindow *, int width, int height)
     WIDTH = width;
     HEIGHT = height;
     glViewport(0, 0, width, height);
+}
+
+glm::vec3 randomUnitAxis()
+{
+    static std::mt19937 rng{ std::random_device{}() };
+    static std::uniform_real_distribution<float> dist(-1.0f, 1.0f);
+
+    glm::vec3 axis;
+
+    do {
+        axis = glm::vec3(
+            dist(rng),
+            dist(rng),
+            dist(rng)
+        );
+    } while (glm::dot(axis, axis) < 1e-6f);  // use dot instead of length2
+
+    return glm::normalize(axis);
 }
 
 int main()
@@ -132,17 +153,37 @@ int main()
 
     Shader normal_shader("vertex_shader.vert", "fragment_shader.frag");
     normal_shader.use();
-    
-    int32_t viewport_sizes = glGetUniformLocation(
-        normal_shader.ID, 
-        "viewport_size"
-    );
-    if(viewport_sizes == -1)
-        std::cerr << "Did not find viewport size variable" << std::endl;
-
-    glUniform2f(viewport_sizes, (float) WIDTH, (float) HEIGHT);
 
     float rot_angle = 0.0f;
+
+    std::vector<Tetrahedron> tetrahedrons;
+    tetrahedrons.reserve(50);
+
+    std::mt19937 rng{ std::random_device{}() };
+
+    // Spread in world space
+    std::uniform_real_distribution<float> distXY(-5.0f, 5.0f);
+    std::uniform_real_distribution<float> distZ(-15.f, -2.0f); // in front of camera at z=+3
+
+    for (int i = 0; i < 50; ++i)
+    {
+        glm::vec3 pos{
+            distXY(rng),
+            distXY(rng),
+            distZ(rng)
+        };
+
+        tetrahedrons.emplace_back(pos);
+        tetrahedrons[i].scale(glm::vec3(0.50f, 0.50f, 0.50f));
+    }
+
+    std::vector<glm::vec3> spinAxes;
+    spinAxes.reserve(50);
+
+    for (int i = 0; i < 50; ++i)
+    {
+        spinAxes.push_back(randomUnitAxis());
+    }
 
     // Render loop
     while (!glfwWindowShouldClose(window))
@@ -154,50 +195,6 @@ int main()
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         normal_shader.use();
-
-        // model
-        int32_t model_loc = glGetUniformLocation(
-            normal_shader.ID,
-            "model"
-        );
-        if(model_loc == -1) {
-            std::cerr << "Did not find a uniform" << std::endl;
-        }
-        glm::mat4 model = glm::mat4(1.0f);
-        model = glm::scale(
-            model, glm::vec3(0.75f, 0.75f, 0.75f)
-        );
-        // model = glm::translate(
-        //     model, glm::vec3(1.0f, 0.5f, -1.0f)
-        // model = glm::rotate(
-        //     model, 
-        //     glm::radians(rot_angle),
-        //     glm::vec3(0.0f, 0.0f, 0.0f)
-        // );
-        model = glm::rotate(
-            model, 
-            glm::radians(rot_angle),
-            glm::vec3(0.0f, 1.0f, 0.0f)
-        );
-        model = glm::translate(
-            model, glm::vec3(2.0f, 0.0f, 0.0f)
-        );
-        model = glm::rotate(
-            model, 
-            glm::radians(-rot_angle),
-            glm::vec3(0.0f, 1.0f, 0.0f)
-        );
-        model = glm::rotate(
-            model, 
-            glm::radians(-90.0f),
-            glm::vec3(1.0f, 0.0f, 0.0f)
-        );
-        glUniformMatrix4fv(
-            model_loc, 
-            1, 
-            GL_FALSE, 
-            glm::value_ptr(model)
-        );
 
         // view 
         glm::mat4 view = glm::mat4(1.0f);
@@ -237,11 +234,13 @@ int main()
             glm::value_ptr(projection)
         );
 
-        glEnable(GL_DEPTH_TEST);
+        constexpr float spin = glm::radians(0.1f);
 
-        glBindVertexArray(VAO);
-        // glDrawArrays(GL_TRIANGLES, 0, 3);
-        glDrawElements(GL_TRIANGLES, 12, GL_UNSIGNED_INT, 0);
+        for (size_t i = 0; i < tetrahedrons.size(); ++i)
+        {
+            tetrahedrons[i].rotate(spin, spinAxes[i]);
+            tetrahedrons[i].draw(normal_shader);
+        }
 
         glfwSwapBuffers(window);
         glfwPollEvents();
