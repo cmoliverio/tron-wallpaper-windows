@@ -66,6 +66,64 @@ Shader::Shader(const char* vertexPath, const char* fragmentPath)
     glDeleteShader(fragment);
 }
 
+Shader::Shader(const char* vertexPath,
+               const char* geometryPath,
+               const char* fragmentPath)
+{
+    std::string vertexCode, geometryCode, fragmentCode;
+    std::ifstream vFile, gFile, fFile;
+
+    vFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
+    gFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
+    fFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
+
+    try {
+        vFile.open(vertexPath);
+        gFile.open(geometryPath);
+        fFile.open(fragmentPath);
+
+        std::stringstream vStream, gStream, fStream;
+        vStream << vFile.rdbuf();
+        gStream << gFile.rdbuf();
+        fStream << fFile.rdbuf();
+
+        vertexCode   = vStream.str();
+        geometryCode = gStream.str();
+        fragmentCode = fStream.str();
+    }
+    catch (...) {
+        std::cerr << "ERROR::SHADER::FILE_NOT_SUCCESFULLY_READ\n";
+        std::terminate();
+    }
+
+    uint32_t vertex   = compile(GL_VERTEX_SHADER,   vertexCode.c_str());
+    uint32_t geometry = compile(GL_GEOMETRY_SHADER, geometryCode.c_str());
+    uint32_t fragment = compile(GL_FRAGMENT_SHADER, fragmentCode.c_str());
+
+    ID = glCreateProgram();
+    glAttachShader(ID, vertex);
+    glAttachShader(ID, geometry);
+    glAttachShader(ID, fragment);
+    glLinkProgram(ID);
+
+    int success = 0;
+    glGetProgramiv(ID, GL_LINK_STATUS, &success);
+    if (!success)
+    {
+        int logLength = 0;
+        glGetProgramiv(ID, GL_INFO_LOG_LENGTH, &logLength);
+        std::vector<char> log(logLength + 1);
+        glGetProgramInfoLog(ID, logLength, nullptr, log.data());
+        std::cerr << "ERROR::SHADER::PROGRAM::LINKING_FAILED\n"
+                  << log.data() << std::endl;
+        std::terminate();
+    }
+
+    glDeleteShader(vertex);
+    glDeleteShader(geometry);
+    glDeleteShader(fragment);
+}
+
 uint32_t Shader::compile(GLenum shader_type, 
         const char* source)
 {
@@ -83,9 +141,15 @@ uint32_t Shader::compile(GLenum shader_type,
         std::vector<char> log(logLength + 1, '\0');
         glGetShaderInfoLog(shader, logLength, nullptr, log.data());
 
+        const char* typeName =
+            shader_type == GL_VERTEX_SHADER   ? "VERTEX"   :
+            shader_type == GL_GEOMETRY_SHADER ? "GEOMETRY" :
+            shader_type == GL_FRAGMENT_SHADER ? "FRAGMENT" :
+                                                "UNKNOWN";
+
         std::cerr
             << "ERROR::SHADER::"
-            << (shader_type == GL_FRAGMENT_SHADER ? "FRAGMENT" : "VERTEX")
+            << typeName
             << "::COMPILATION_FAILED\n"
             << log.data()
             << std::endl;

@@ -22,36 +22,6 @@
 int WIDTH = 1280;
 int HEIGHT = 720;
 
-float sqrt_of_2 = std::sqrt(2.0f);
-float sqrt_of_3 = std::sqrt(3.0f);
-float sqrt_of_6 = std::sqrt(6.0f);
-
-float vertices[] = {
-    // position x y z                            // colors
-    0.0f, 1.0f, 0.0f,                               0.0f, 0.0f, 1.0f,
-    sqrt_of_3 / 2.0f, -0.5f, 0.0f,      1.0f, 0.0f, 0.0f,
-    -sqrt_of_3 / 2.0f, -0.5f, 0.0f,     0.0f, 1.0f, 0.0f
-};
-
-float pyrdamid_vertices[] = {
-    // x y z 
-    0.0f, 0.0f, 1.0f,
-    2.0f * sqrt_of_2 / 3.0f, 0.0f, -1.0f / 3.0f,
-    -sqrt_of_2 / 3.0f, sqrt_of_6 / 3.0f, -1.0f / 3.0f,
-    -sqrt_of_2 / 3.0f, -sqrt_of_6 / 3.0f, -1.0f / 3.0f,
-};
-
-unsigned int pyramid_indices[] = {
-    // Side faces
-    0, 1, 2,
-    0, 2, 3,
-    0, 3, 1,
-
-    // Base face
-    1, 3, 2
-};
-
-
 static void framebuffer_size_callback(GLFWwindow *, int width, int height)
 {
     WIDTH = width;
@@ -70,9 +40,8 @@ glm::vec3 randomUnitAxis()
         axis = glm::vec3(
             dist(rng),
             dist(rng),
-            dist(rng)
-        );
-    } while (glm::dot(axis, axis) < 1e-6f);  // use dot instead of length2
+            dist(rng));
+    } while (glm::dot(axis, axis) < 1e-6f); // use dot instead of length2
 
     return glm::normalize(axis);
 }
@@ -115,43 +84,11 @@ int main()
     std::cout << "Renderer: " << glGetString(GL_RENDERER) << "\n";
     std::cout << "OpenGL: " << glGetString(GL_VERSION) << "\n";
 
-    uint32_t VAO, VBO, EBO;
-
-    glGenVertexArrays(1, &VAO);
-    glGenBuffers(1, &VBO);
-    glGenBuffers(1, &EBO);
-
-    glBindVertexArray(VAO);
-
-    // Vertex buffer
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, 
-        sizeof(pyrdamid_vertices), 
-        pyrdamid_vertices, 
-        GL_STATIC_DRAW);
-
-    // Index buffer
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, 
-        sizeof(pyramid_indices), 
-        pyramid_indices, 
-        GL_STATIC_DRAW);
-
-    // Vertex attribute
-    glVertexAttribPointer(
-        0,                      // location
-        3,                      // vec3
-        GL_FLOAT,
-        GL_FALSE,
-        3 * sizeof(float),
-        (void*)0
+    Shader normal_shader(
+        "vertex_shader.vert", 
+        "geometry_shader.geom",
+        "fragment_shader.frag"
     );
-    glEnableVertexAttribArray(0);
-
-    glBindVertexArray(0);
-
-
-    Shader normal_shader("vertex_shader.vert", "fragment_shader.frag");
     normal_shader.use();
 
     float rot_angle = 0.0f;
@@ -184,6 +121,8 @@ int main()
     {
         spinAxes.push_back(randomUnitAxis());
     }
+
+    glEnable(GL_DEPTH_TEST);
 
     // Render loop
     while (!glfwWindowShouldClose(window))
@@ -238,6 +177,7 @@ int main()
 
         for (size_t i = 0; i < tetrahedrons.size(); ++i)
         {
+            // spinAxes[i] = randomUnitAxis();
             tetrahedrons[i].rotate(spin, spinAxes[i]);
             tetrahedrons[i].draw(normal_shader);
         }
