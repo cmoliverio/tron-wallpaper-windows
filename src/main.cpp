@@ -91,10 +91,10 @@ int main()
     );
     normal_shader.use();
 
-    float rot_angle = 0.0f;
+    uint32_t num_of_objs = 100;
 
     std::vector<Tetrahedron> tetrahedrons;
-    tetrahedrons.reserve(50);
+    tetrahedrons.reserve(num_of_objs);
 
     std::mt19937 rng{ std::random_device{}() };
 
@@ -102,7 +102,7 @@ int main()
     std::uniform_real_distribution<float> distXY(-5.0f, 5.0f);
     std::uniform_real_distribution<float> distZ(-15.f, -2.0f); // in front of camera at z=+3
 
-    for (int i = 0; i < 50; ++i)
+    for (int i = 0; i < num_of_objs; ++i)
     {
         glm::vec3 pos{
             distXY(rng),
@@ -111,15 +111,33 @@ int main()
         };
 
         tetrahedrons.emplace_back(pos);
-        tetrahedrons[i].scale(glm::vec3(0.50f, 0.50f, 0.50f));
+        tetrahedrons[i].scale(glm::vec3(0.30f, 0.30f, 0.30f));
     }
 
     std::vector<glm::vec3> spinAxes;
-    spinAxes.reserve(50);
+    spinAxes.reserve(num_of_objs);
 
-    for (int i = 0; i < 50; ++i)
+    for (int i = 0; i < num_of_objs; ++i)
     {
         spinAxes.push_back(randomUnitAxis());
+    }
+
+    std::vector<float> spinSpeeds;  // radians per frame
+    spinSpeeds.reserve(num_of_objs);
+
+    std::normal_distribution<float> spinDegDist(0.1f, 0.1f); // degrees
+    // std::mt19937 rng{ std::random_device{}() };
+
+    for (int i = 0; i < num_of_objs; ++i)
+    {
+        float spinDeg;
+
+        // Draw until within desired range (truncated normal)
+        do {
+            spinDeg = spinDegDist(rng);
+        } while (spinDeg < 0.01f || spinDeg > 0.2f);
+
+        spinSpeeds.push_back(glm::radians(spinDeg)); // convert to radians
     }
 
     glEnable(GL_DEPTH_TEST);
@@ -173,19 +191,17 @@ int main()
             glm::value_ptr(projection)
         );
 
-        constexpr float spin = glm::radians(0.1f);
+        constexpr float spin = glm::radians(0.5f);
 
         for (size_t i = 0; i < tetrahedrons.size(); ++i)
         {
-            // spinAxes[i] = randomUnitAxis();
-            tetrahedrons[i].rotate(spin, spinAxes[i]);
+            // then get the value for that triangle here and make the spin speed
+            tetrahedrons[i].rotate(spinSpeeds[i], spinAxes[i]);
             tetrahedrons[i].draw(normal_shader, i);
         }
 
         glfwSwapBuffers(window);
         glfwPollEvents();
-
-        rot_angle += 0.05f;
     }
 
     glfwDestroyWindow(window);
