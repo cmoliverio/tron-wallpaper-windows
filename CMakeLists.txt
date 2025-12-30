@@ -31,6 +31,7 @@ target_link_libraries(tron_wallpaper
         glfw
         glad::glad
         glm::glm
+        opengl32
 )
 
 # MSVC niceties

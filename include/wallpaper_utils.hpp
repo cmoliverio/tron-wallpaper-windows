@@ -14,5 +14,6 @@ LRESULT CALLBACK WallpaperWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPa
 
 // Attach a GLFW window to WorkerW and apply styles
 void AttachGLFWWindowToWallpaper(HWND hwnd);
+bool UpdateLayeredWindowFromDC(HWND hwnd, HDC hdcSrc, int width, int height);
 
 #endif // WALLPAPER_UTILS_HPP
