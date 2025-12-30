@@ -1,5 +1,7 @@
+#define GLFW_EXPOSE_NATIVE_WIN32
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
+#include <GLFW/glfw3native.h>
 #include <string>
 #include <iterator>
 #include <fstream>
@@ -14,7 +16,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-// #include <shader_utils.hpp>
+#include "wallpaper_utils.hpp"
 #include "shader.hpp"
 #include "tetrahedron.hpp"
 
@@ -58,6 +60,30 @@ int main()
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_DECORATED, GLFW_FALSE);
+    glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+    glfwWindowHint(GLFW_VISIBLE, GLFW_TRUE);
+    glfwWindowHint(GLFW_FOCUS_ON_SHOW, GLFW_FALSE);
+    glfwWindowHint(GLFW_FLOATING, GLFW_FALSE);
+
+    GLFWmonitor* monitor = glfwGetPrimaryMonitor();
+    if (!monitor)
+    {
+        std::cerr << "Failed to get primary monitor\n";
+        glfwTerminate();
+        return -1;
+    }
+
+    const GLFWvidmode* mode = glfwGetVideoMode(monitor);
+    if (!mode)
+    {
+        std::cerr << "Failed to get video mode\n";
+        glfwTerminate();
+        return -1;
+    }
+
+    WIDTH  = mode->width;
+    HEIGHT = mode->height;
 
     GLFWwindow *window = glfwCreateWindow(
         WIDTH, HEIGHT,
@@ -71,6 +97,9 @@ int main()
         glfwTerminate();
         return -1;
     }
+
+    HWND hwnd = glfwGetWin32Window(window);
+    AttachGLFWWindowToWallpaper(hwnd);
 
     glfwMakeContextCurrent(window);
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
@@ -91,7 +120,7 @@ int main()
     );
     normal_shader.use();
 
-    uint32_t num_of_objs = 100;
+    uint32_t num_of_objs = 200;
 
     std::vector<Tetrahedron> tetrahedrons;
     tetrahedrons.reserve(num_of_objs);
