@@ -85,6 +85,54 @@ void init_os()
     );
 }
 
+void attach_24h2_or_newer(HWND window, uint32_t width, uint32_t height)
+{
+    HWND progman = get_progman();
+
+    // prepare the engine window to be a layered child of Progman
+    LONG_PTR style = GetWindowLongPtr(window, GWL_STYLE);
+    style &= ~(WS_OVERLAPPEDWINDOW); // remove decorations
+    style |= WS_CHILD; // child required for SetParent
+    SetWindowLongPtr(window, GWL_STYLE, style);
+
+    LONG_PTR exStyle = GetWindowLongPtr(window, GWL_EXSTYLE);
+    exStyle |= WS_EX_LAYERED; // make it a layered window for 24H2 or newer
+    SetWindowLongPtr(window, GWL_EXSTYLE, exStyle);
+
+    // set fully opaque
+    SetLayeredWindowAttributes(window, 0, 255, LWA_ALPHA);
+
+    // parent to progman
+    SetParent(window, progman);
+
+    HWND shell = FindWindowEx(progman, NULL, "SHELLDLL_DefView", NULL);
+    if (!shell) { 
+        std::cerr << "WARNING: Missing SHELLDLL_DefView\n" 
+            << "The wallpaper might cover desktop icons..."
+            << std::endl;
+    } else {
+        // move below SHELLDLL_DefView
+        SetWindowPos(
+            window,
+            shell,
+            0, 0, 
+            0, 0,
+            (SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE)
+        );
+    }
+
+    // resize/reposition the engine window to match progman
+    SetWindowPos(
+        window,
+        NULL,
+        0,
+        0,
+        width,
+        height,
+        (SWP_NOZORDER | SWP_NOACTIVATE)
+    );
+}
+
 void attach_wallpaper_to_os(HWND window, uint32_t width, uint32_t height)
 {
     HWND progman = get_progman();
@@ -95,65 +143,12 @@ void attach_wallpaper_to_os(HWND window, uint32_t width, uint32_t height)
     // as WS_EX_NOREDIRECTIONBITMAP. run spyxx.exe for more info:
     // (comes with Visual Studio)
     // C:/Program Files/Microsoft Visual Studio/<vrsn>/<dstrbtn>/Common7/Tools/spyxx.exe
-    bool is_raised_desktop = GetWindowLongPtr(progman, GWL_EXSTYLE);
-    is_raised_desktop &= WS_EX_NOREDIRECTIONBITMAP;
+    LONG_PTR extended_style = GetWindowLongPtr(progman, GWL_EXSTYLE);
+    bool is_raised_desktop = (extended_style & WS_EX_NOREDIRECTIONBITMAP) != 0;
 
     if (is_raised_desktop) {
         std::cout << "Assuming 24H2 Windows or newer..."  << std::endl;
-        HWND shell = FindWindowEx(progman, NULL, "SHELLDLL_DefView", NULL);
-        if (!shell) { 
-            std::cerr << "WARNING: Missing SHELLDLL_DefView" << std::endl;
-        }
-
-        HWND workerW = FindWindowEx(progman, NULL, "WorkerW", NULL);
-        if (!workerW) { 
-            std::cerr << "WARNING: Missing WorkerW" << std::endl;
-        }
-
-        // Prepare the engine window to be a layered child of Progman
-        LONG_PTR style = GetWindowLongPtr(window, GWL_STYLE);
-        style &= ~(WS_OVERLAPPEDWINDOW); // remove decorations
-        style |= WS_CHILD; // child required for SetParent
-        SetWindowLongPtr(window, GWL_STYLE, style);
-
-        LONG_PTR exStyle = GetWindowLongPtr(window, GWL_EXSTYLE);
-        exStyle |= WS_EX_LAYERED; // Make it a layered window for 24H2
-        SetWindowLongPtr(window, GWL_EXSTYLE, exStyle);
-
-        // set fully opaque
-        SetLayeredWindowAttributes(window, 0, 255, LWA_ALPHA);
-
-        // parent to progman
-        SetParent(window, progman);
-
-        // move below SHELLDLL_DefView
-        SetWindowPos(
-            window,
-            shell,
-            0, 0, 
-            0, 0,
-            (SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE)
-        );
-
-        // move worker below our window
-        SetWindowPos(
-            workerW,
-            window,
-            0, 0, 
-            0, 0,
-            (SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE)
-        );
-
-        // resize/reposition the engine window to match progman
-        SetWindowPos(
-            window,
-            NULL,
-            0,
-            0,
-            width,
-            height,
-            (SWP_NOZORDER | SWP_NOACTIVATE)
-        );
+        attach_24h2_or_newer(window, width, height);
     } else {
         std::cout << "Assuming pre 24H2 Windows..."  << std::endl;
     }
@@ -179,6 +174,8 @@ int main()
 
     // set as background
     attach_wallpaper_to_os(hwnd, width, height);
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(2000));
 
     // stop for now and cleanup
     glfwDestroyWindow(window);
