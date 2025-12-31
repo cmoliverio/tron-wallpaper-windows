@@ -1,108 +1,20 @@
-// #define WIN32_LEAN_AND_MEAN
-// #include <windows.h>
-
-// #include <GL/gl.h>
-// // #define GLFW_EXPOSE_NATIVE_WIN32
-// // #include <glad/glad.h>
-// // #include <GLFW/glfw3.h>
-// // #include <GLFW/glfw3native.h>
-// #include <string>
-// #include <iterator>
-// #include <fstream>
-// #include <sstream>
-// #include <iostream>
-// #include <cmath>
-// #include <vector>
-// #include <random>
-
-// // // graphics library mathematics :) 
-// // #include <glm/glm.hpp>
-// // #include <glm/gtc/matrix_transform.hpp>
-// // #include <glm/gtc/type_ptr.hpp>
-// #include <GL/glu.h>
-
-// #include "wallpaper_utils.hpp"
-
-// #pragma comment(lib, "opengl32.lib")
-// #pragma comment(lib, "gdi32.lib")
-// #include "shader.hpp"
-// #include "tetrahedron.hpp"
-//
-// #include <windows.h>
-// #include <GL/gl.h>
-// #include <iostream>
-// #include <cmath>  // For sin()
-//
-#include <windows.h>
-#include <GL/gl.h>
-#include <d3d11.h>
-#include <dxgi.h>
+#define GLFW_EXPOSE_NATIVE_WIN32
+// #include <glad/glad.h>
+#include <GLFW/glfw3.h>
+#include <GLFW/glfw3native.h>
 #include <iostream>
+#include <algorithm>
+#include <chrono>
+#include <thread>
 #include <cmath>
-#include "wallpaper_utils.hpp"
-
-// #pragma comment(lib, "d3d11.lib")
-// #pragma comment(lib, "dxgi.lib")
-#pragma comment(lib, "opengl32.lib")
-#pragma comment(lib, "gdi32.lib")
 
 // For DPI awareness functions
 #include <shellscalingapi.h>
 #pragma comment(lib, "Shlwapi.lib")
 
-// For PathFindFileNameW
+// // For PathFindFileNameW
 #include <shlwapi.h>
 #pragma comment(lib, "Shcore.lib")
-
-// #define WIDTH 960
-// int WIDTH = 1280;
-// int HEIGHT = 720;
-
-// static void framebuffer_size_callback(GLFWwindow *, int width, int height)
-// {
-//     WIDTH = width;
-//     HEIGHT = height;
-//     glViewport(0, 0, width, height);
-// }
-
-// glm::vec3 randomUnitAxis()
-// {
-//     static std::mt19937 rng{ std::random_device{}() };
-//     static std::uniform_real_distribution<float> dist(-1.0f, 1.0f);
-
-//     glm::vec3 axis;
-
-//     do {
-//         axis = glm::vec3(
-//             dist(rng),
-//             dist(rng),
-//             dist(rng));
-//     } while (glm::dot(axis, axis) < 1e-6f); // use dot instead of length2
-
-//     return glm::normalize(axis);
-// }
-
-LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
-{
-    switch (msg)
-    {
-        case WM_DESTROY:
-            PostQuitMessage(0);
-            return 0;
-        case WM_PAINT:
-        {
-            PAINTSTRUCT ps;
-            BeginPaint(hwnd, &ps);
-            EndPaint(hwnd, &ps);
-            return 0;
-        }
-        default:
-            return DefWindowProcW(hwnd, msg, wParam, lParam);
-    }
-}
-
-#include <windows.h>
-#include <iostream>
 
 // Global handle to store the found ShellDLL_DefView
 HWND hShellDefView = NULL;
@@ -208,13 +120,23 @@ HWND FindWorkerW(HWND progman)
     return nullptr;
 }
 
+
 bool HasExtendedStyle(HWND hwnd, DWORD exStyle)
 {
     return (GetWindowLongPtr(hwnd, GWL_EXSTYLE) & exStyle) != 0;
 }
 
+
 int main()
 {
+	// Initialize GLFW
+	if (!glfwInit()) {
+		std::cout << "Failed to initialize GLFW" << std::endl;
+		return -1;
+	}
+
+	glfwWindowHint(GLFW_SCALE_TO_MONITOR, GLFW_TRUE);
+
     HINSTANCE hInstance = GetModuleHandle(nullptr);
 
     HRESULT dpiAwarenessResult = SetProcessDpiAwareness(PROCESS_PER_MONITOR_DPI_AWARE);
@@ -256,18 +178,33 @@ int main()
         return 0;
     }
 
-    DWORD ex = WS_EX_LAYERED | WS_EX_NOACTIVATE;
-    HWND hLiveWP = CreateWindowEx(
-        ex,
-        "LiveWPClass",
-        "",
-        WS_CHILD,
-        0, 0, 2560, 1440,
-        progman,
-        nullptr,
-        hInstance,
-        nullptr
-    );
+    // DWORD ex = WS_EX_LAYERED | WS_EX_NOACTIVATE;
+    // HWND hLiveWP = CreateWindowEx(
+    //     ex,
+    //     "LiveWPClass",
+    //     "",
+    //     WS_CHILD,
+    //     0, 0, 2560, 1440,
+    //     progman,
+    //     nullptr,
+    //     hInstance,
+    //     nullptr
+    // );
+    //
+	// Create GLFW window with the size of the monitor.
+	GLFWwindow *window = glfwCreateWindow(
+		2560, 1440, "GLFW Wallpaper", nullptr, nullptr
+	);
+	if (!window) {
+		std::cout << "Failed to create GLFW window" << std::endl;
+		glfwTerminate();
+		return -1;
+	}
+
+	// Make the window's context current.
+	glfwMakeContextCurrent(window);
+
+	HWND hLiveWP = glfwGetWin32Window(window);
 
     // Prepare the engine window to be a layered child of Progman
     LONG_PTR style = GetWindowLongPtr(hLiveWP, GWL_STYLE);
@@ -301,59 +238,42 @@ int main()
 
     // Resize/reposition the engine window to match its new parent.
     // g_progmanWindowHandle spans the entire virtual desktop in modern builds
-    // SetWindowPos(
-    //     hLiveWP,
-    //     NULL,
-    //     0,
-    //     0,
-    //     2560,
-    //     1440,
-    //     SWP_NOZORDER | SWP_NOACTIVATE
-    // );
+    SetWindowPos(
+        hLiveWP,
+        NULL,
+        0,
+        0,
+        2560,
+        1440,
+        SWP_NOZORDER | SWP_NOACTIVATE
+    );
 
-    // RedrawWindow(hLiveWP, NULL, NULL, RDW_INVALIDATE | RDW_UPDATENOW);
+    RedrawWindow(hLiveWP, NULL, NULL, RDW_INVALIDATE | RDW_UPDATENOW);
 
     // ShowWindow(hLiveWP, SW_SHOW);
+    glfwSwapInterval(1);
 
     std::cout << "GLFW window successfully attached under Progman\n";
     
-    MSG msg = {};
-    bool running = true;
-    int frameCount = 0;
-    DWORD startTime = GetTickCount();
-    
-    while (running)
-    {
-        // Process messages
-        while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
-        {
-            if (msg.message == WM_QUIT)
-            {
-                running = false;
-                break;
-            }
-            TranslateMessage(&msg);
-            DispatchMessage(&msg);
-        }
-        
-        float time = (GetTickCount() - startTime) / 1000.0f;
-        float r = (float)((sin(time * 0.5) + 1.0) * 0.5);
-        float g = (float)((sin(time * 0.7) + 1.0) * 0.5);
-        float b = (float)((sin(time * 0.3) + 1.0) * 0.5);
-        
-        glClearColor(r, g, b, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT);
-        
-        // Swap buffers to render
-        // SwapBuffers(hdc);
-        
-        frameCount++;
-        if (frameCount % 120 == 0)
-        {
-            std::cout << "Frame " << frameCount << " - Rendering...\n";
-        }
-        
-        Sleep(16); // ~60 FPS
-    }
+	while (!glfwWindowShouldClose(window)) {
+		// // Animate background color to show frames are rendering.
+		double timeSeconds = glfwGetTime();
+		float pulse = 0.5f + 0.5f * std::sin(static_cast<float>(timeSeconds) * 2.0f);
+		glClearColor(0.08f + 0.12f * pulse, 0.15f + 0.25f * pulse, 0.25f + 0.35f * pulse, 1.0f);
+		glClear(GL_COLOR_BUFFER_BIT);
+
+		// Ensure viewport matches framebuffer size (HiDPI aware)
+		int winW = 0, winH = 0;
+		int fbW = 0, fbH = 0;
+		glfwGetWindowSize(window, &winW, &winH);
+		glfwGetFramebufferSize(window, &fbW, &fbH);
+		glViewport(0, 0, fbW, fbH);
+
+
+		glfwSwapBuffers(window);
+		glfwPollEvents();
+
+		std::this_thread::sleep_for(std::chrono::milliseconds(100));
+	}
     
 }
