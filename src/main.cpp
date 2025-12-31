@@ -29,50 +29,6 @@ int main()
 		return -1;
 	}
 
-
-	glfwWindowHint(GLFW_SCALE_TO_MONITOR, GLFW_TRUE);
-
-    HINSTANCE hInstance = GetModuleHandle(nullptr);
-
-    HRESULT dpiAwarenessResult = SetProcessDpiAwareness(PROCESS_PER_MONITOR_DPI_AWARE);
-    if (FAILED(dpiAwarenessResult)) {
-        // Continue if needed, but coordinate values may be scaled.
-    }
-
-
-    HWND progman = FindWindowW(L"Progman", nullptr);
-    if (!progman)
-    {
-        std::cerr << "Progman not found\n";
-        return 0;
-    }
-
-    bool isRaisedDesktop = HasExtendedStyle(progman, WS_EX_NOREDIRECTIONBITMAP);
-    std::cout << "Is raised desktop: " << (isRaisedDesktop ? "YES" : "NO") << std::endl;
-
-    // Always send this — harmless on older desktops
-    SendMessageTimeout(
-        progman,
-        0x052C, // Progman spawn WorkerW
-        0, 0,
-        SMTO_NORMAL,
-        1000,
-        nullptr
-    );
-
-    // Try to locate the Shell view (desktop icons) and WorkerW child directly under Progman
-    HWND shellView = FindWindowEx(progman, NULL, "SHELLDLL_DefView", NULL);
-    HWND workerW = FindWindowEx(progman, NULL, "WorkerW", NULL);
-
-    std::cout << "ShellView: " << shellView << std::endl;
-    std::cout << "WorkerW:   " << workerW   << std::endl;
-
-    if (!shellView || !workerW)
-    {
-        std::cerr << "Failed to locate desktop components\n";
-        return 0;
-    }
-
 	// Create GLFW window with the size of the monitor.
 	GLFWwindow *window = glfwCreateWindow(
 		2560, 1440, "GLFW Wallpaper", nullptr, nullptr
@@ -94,6 +50,50 @@ int main()
 
 	HWND hLiveWP = glfwGetWin32Window(window);
 
+	glfwWindowHint(GLFW_SCALE_TO_MONITOR, GLFW_TRUE);
+
+    // HINSTANCE hInstance = GetModuleHandle(nullptr);
+
+    // HRESULT dpiAwarenessResult = SetProcessDpiAwareness(PROCESS_PER_MONITOR_DPI_AWARE);
+    // if (FAILED(dpiAwarenessResult)) {
+    //     // Continue if needed, but coordinate values may be scaled.
+    // }
+
+
+    HWND progman = FindWindowW(L"Progman", nullptr);
+    if (!progman)
+    {
+        std::cerr << "Progman not found\n";
+        return 0;
+    }
+
+    bool isRaisedDesktop = HasExtendedStyle(progman, WS_EX_NOREDIRECTIONBITMAP);
+    std::cout << "Is raised desktop: " << (isRaisedDesktop ? "YES" : "NO") << std::endl;
+
+    // Always send this — harmless on older desktops
+    // SendMessageTimeout(
+    //     progman,
+    //     0x052C, // Progman spawn WorkerW
+    //     0, 0,
+    //     SMTO_NORMAL,
+    //     1000,
+    //     nullptr
+    // );
+
+    // Try to locate the Shell view (desktop icons) and WorkerW child directly under Progman
+    HWND shellView = FindWindowEx(progman, NULL, "SHELLDLL_DefView", NULL);
+    // HWND workerW = FindWindowEx(progman, NULL, "WorkerW", NULL);
+
+    std::cout << "ShellView: " << shellView << std::endl;
+    // std::cout << "WorkerW:   " << workerW   << std::endl;
+
+    if (!shellView)
+    {
+        std::cerr << "Failed to locate desktop components\n";
+        return 0;
+    }
+
+
     // Prepare the engine window to be a layered child of Progman
     LONG_PTR style = GetWindowLongPtr(hLiveWP, GWL_STYLE);
     style &= ~(WS_OVERLAPPEDWINDOW); // Remove decorations
@@ -103,7 +103,7 @@ int main()
     LONG_PTR exStyle = GetWindowLongPtr(hLiveWP, GWL_EXSTYLE);
     exStyle |= WS_EX_LAYERED; // Make it a layered window for 24H2
     SetWindowLongPtr(hLiveWP, GWL_EXSTYLE, exStyle);
-    SetLayeredWindowAttributes(hLiveWP, 0, 255, LWA_ALPHA);
+    // SetLayeredWindowAttributes(hLiveWP, 0, 255, LWA_ALPHA);
 
     // Reparent the engine window directly to Progman
     SetParent(hLiveWP, progman);
@@ -116,13 +116,13 @@ int main()
         SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE
     );
 
-    // Push WorkerW behind wallpaper
-    SetWindowPos(
-        workerW,
-        hLiveWP,
-        0, 0, 0, 0,
-        SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE
-    );
+    // // Push WorkerW behind wallpaper
+    // SetWindowPos(
+    //     workerW,
+    //     hLiveWP,
+    //     0, 0, 0, 0,
+    //     SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE
+    // );
 
     // Resize/reposition the engine window to match its new parent.
     // g_progmanWindowHandle spans the entire virtual desktop in modern builds
@@ -136,10 +136,10 @@ int main()
         SWP_NOZORDER | SWP_NOACTIVATE
     );
 
-    RedrawWindow(hLiveWP, NULL, NULL, RDW_INVALIDATE | RDW_UPDATENOW);
+    // RedrawWindow(hLiveWP, NULL, NULL, RDW_INVALIDATE | RDW_UPDATENOW);
 
     // ShowWindow(hLiveWP, SW_SHOW);
-    glfwSwapInterval(1);
+    // glfwSwapInterval(1);
 
     std::cout << "GLFW window successfully attached under Progman\n";
     
@@ -161,7 +161,7 @@ int main()
 		glfwSwapBuffers(window);
 		glfwPollEvents();
 
-		std::this_thread::sleep_for(std::chrono::milliseconds(16));
+		std::this_thread::sleep_for(std::chrono::milliseconds(7));
 	}
     
 }
