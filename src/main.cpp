@@ -133,6 +133,38 @@ void attach_24h2_or_newer(HWND window, uint32_t width, uint32_t height)
     );
 }
 
+BOOL CALLBACK EnumWindowsProc(HWND hwnd, LPARAM lParam)
+{
+    HWND shell = FindWindowEx(hwnd, NULL, "SHELLDLL_DefView", NULL);
+    if (shell != NULL) {
+        HWND* workerW = reinterpret_cast<HWND*>(lParam);
+        *workerW = FindWindowEx(NULL, hwnd, "WorkerW", NULL);
+        return FALSE; // stop
+    }
+    return TRUE; // continue
+};
+
+void attach_pre_24h2(HWND window)
+{
+    HWND workerW = nullptr;
+
+    // find WorkerW
+    EnumWindows(EnumWindowsProc, reinterpret_cast<LPARAM>(&workerW));
+    if (!workerW)
+    {
+        std::cerr << "Failed to locate WorkerW\n";
+        std::exit(-1);
+    }
+
+    // set extended style as child and remove overlapping
+    LONG_PTR style = GetWindowLongPtr(window, GWL_STYLE);
+    style &= ~(WS_OVERLAPPEDWINDOW);
+    style |= WS_CHILD; // MUST be a child
+    SetWindowLongPtr(window, GWL_STYLE, style);
+
+    SetParent(window, workerW);
+}
+
 void attach_wallpaper_to_os(HWND window, uint32_t width, uint32_t height)
 {
     HWND progman = get_progman();
@@ -151,6 +183,7 @@ void attach_wallpaper_to_os(HWND window, uint32_t width, uint32_t height)
         attach_24h2_or_newer(window, width, height);
     } else {
         std::cout << "Assuming pre 24H2 Windows..."  << std::endl;
+        attach_pre_24h2(window);
     }
 }
 
@@ -174,74 +207,6 @@ int main()
 
     // set as background
     attach_wallpaper_to_os(hwnd, width, height);
-
-    std::this_thread::sleep_for(std::chrono::milliseconds(2000));
-
-    // stop for now and cleanup
-    glfwDestroyWindow(window);
-    glfwTerminate();
-    std::exit(0);
-
-    // // Try to locate the Shell view (desktop icons) and WorkerW child directly under Progman
-    // HWND shellView = FindWindowEx(progman, NULL, "SHELLDLL_DefView", NULL);
-    // // HWND workerW = FindWindowEx(progman, NULL, "WorkerW", NULL);
-
-    // std::cout << "ShellView: " << shellView << std::endl;
-    // std::cout << "WorkerW:   " << workerW   << std::endl;
-
-    // if (!shellView)
-    // {
-    //     std::cerr << "Failed to locate desktop components\n";
-    //     return 0;
-    // }
-
-
-    // // Prepare the engine window to be a layered child of Progman
-    // LONG_PTR style = GetWindowLongPtr(hLiveWP, GWL_STYLE);
-    // style &= ~(WS_OVERLAPPEDWINDOW); // Remove decorations
-    // style |= WS_CHILD; // Child style required for SetParent
-    // SetWindowLongPtr(hLiveWP, GWL_STYLE, style);
-
-    // LONG_PTR exStyle = GetWindowLongPtr(hLiveWP, GWL_EXSTYLE);
-    // exStyle |= WS_EX_LAYERED; // Make it a layered window for 24H2
-    // SetWindowLongPtr(hLiveWP, GWL_EXSTYLE, exStyle);
-    // // SetLayeredWindowAttributes(hLiveWP, 0, 255, LWA_ALPHA);
-
-    // // Reparent the engine window directly to Progman
-    // SetParent(hLiveWP, progman);
-
-    // // Place wallpaper ABOVE icons
-    // SetWindowPos(
-    //     hLiveWP,
-    //     shellView,
-    //     0, 0, 0, 0,
-    //     SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE
-    // );
-
-    // // // Push WorkerW behind wallpaper
-    // // SetWindowPos(
-    // //     workerW,
-    // //     hLiveWP,
-    // //     0, 0, 0, 0,
-    // //     SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE
-    // // );
-
-    // // Resize/reposition the engine window to match its new parent.
-    // // g_progmanWindowHandle spans the entire virtual desktop in modern builds
-    // SetWindowPos(
-    //     hLiveWP,
-    //     NULL,
-    //     0,
-    //     0,
-    //     2560,
-    //     1440,
-    //     SWP_NOZORDER | SWP_NOACTIVATE
-    // );
-
-    // // RedrawWindow(hLiveWP, NULL, NULL, RDW_INVALIDATE | RDW_UPDATENOW);
-
-    // // ShowWindow(hLiveWP, SW_SHOW);
-    // // glfwSwapInterval(1);
 
     std::cout << "GLFW window successfully attached under Progman\n";
     
