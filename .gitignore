@@ -4,4 +4,4 @@ source_me.sh
 *.exe
 *.pdb
 source*.sh
-.vst
+.vs

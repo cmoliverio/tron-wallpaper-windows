@@ -4,18 +4,18 @@
 // #include <dwmapi.h>
 // #pragma comment(lib, "dwmapi.lib")
 
-bool HasExtendedStyle(HWND hwnd, DWORD style)
-{
-    if (hwnd == nullptr)
-        return false;
+// bool HasExtendedStyle(HWND hwnd, DWORD style)
+// {
+//     if (hwnd == nullptr)
+//         return false;
 
-    // Use GetWindowLongPtr for 64-bit and 32-bit compatibility
-    LONG_PTR exStyle = GetWindowLongPtr(hwnd, GWL_EXSTYLE);
-    if (exStyle == 0)
-        return false;
+//     // Use GetWindowLongPtr for 64-bit and 32-bit compatibility
+//     LONG_PTR exStyle = GetWindowLongPtr(hwnd, GWL_EXSTYLE);
+//     if (exStyle == 0)
+//         return false;
 
-    return (exStyle & style) != 0;
-}
+//     return (exStyle & style) != 0;
+// }
 
 bool TrySetParent(HWND child, HWND parent)
 {
@@ -76,78 +76,78 @@ void SpawnWorkerW()
     std::cout << "SendMessage result: " << result << std::endl;
 }
 
-HWND GetWallpaperWorkerW()
-{
-    HWND progman = FindWindowW(L"Progman", nullptr);
-    HWND shellDLL_DefView = FindWindowExW(progman, nullptr, L"SHELLDLL_DefView", nullptr);
+// HWND GetWallpaperWorkerW()
+// {
+//     HWND progman = FindWindowW(L"Progman", nullptr);
+//     HWND shellDLL_DefView = FindWindowExW(progman, nullptr, L"SHELLDLL_DefView", nullptr);
     
-    // Check if raised desktop with layered ShellView
-    bool isRaisedDesktop = HasExtendedStyle(progman, WS_EX_NOREDIRECTIONBITMAP);
+//     // Check if raised desktop with layered ShellView
+//     bool isRaisedDesktop = HasExtendedStyle(progman, WS_EX_NOREDIRECTIONBITMAP);
     
-    if (isRaisedDesktop)
-    {
-        // In raised desktop, WorkerW is a direct child of Progman
-        HWND workerW = FindWindowExW(progman, nullptr, L"WorkerW", nullptr);
-        std::cout << "Raised desktop detected, WorkerW (child of Progman): " << workerW << std::endl;
-        return workerW;
-    }
-    else
-    {
-        // Original logic for older Windows versions
-        HWND defViewParent = nullptr;
+//     if (isRaisedDesktop)
+//     {
+//         // In raised desktop, WorkerW is a direct child of Progman
+//         HWND workerW = FindWindowExW(progman, nullptr, L"WorkerW", nullptr);
+//         std::cout << "Raised desktop detected, WorkerW (child of Progman): " << workerW << std::endl;
+//         return workerW;
+//     }
+//     else
+//     {
+//         // Original logic for older Windows versions
+//         HWND defViewParent = nullptr;
         
-        EnumWindows([](HWND hwnd, LPARAM lParam) -> BOOL
-        {
-            HWND defView = FindWindowExW(hwnd, nullptr, L"SHELLDLL_DefView", nullptr);
-            if (defView)
-            {
-                *reinterpret_cast<HWND*>(lParam) = hwnd;
-                return FALSE;
-            }
-            return TRUE;
-        }, reinterpret_cast<LPARAM>(&defViewParent));
+//         EnumWindows([](HWND hwnd, LPARAM lParam) -> BOOL
+//         {
+//             HWND defView = FindWindowExW(hwnd, nullptr, L"SHELLDLL_DefView", nullptr);
+//             if (defView)
+//             {
+//                 *reinterpret_cast<HWND*>(lParam) = hwnd;
+//                 return FALSE;
+//             }
+//             return TRUE;
+//         }, reinterpret_cast<LPARAM>(&defViewParent));
 
-        if (!defViewParent)
-            return nullptr;
+//         if (!defViewParent)
+//             return nullptr;
 
-        // Find the next WorkerW after defViewParent
-        HWND workerW = nullptr;
-        bool foundDefViewParent = false;
+//         // Find the next WorkerW after defViewParent
+//         HWND workerW = nullptr;
+//         bool foundDefViewParent = false;
         
-        EnumWindows([](HWND hwnd, LPARAM lParam) -> BOOL
-        {
-            auto* state = reinterpret_cast<std::pair<bool*, std::pair<HWND, HWND*>*>*>(lParam);
-            bool& foundDefViewParent = *state->first;
-            HWND defViewParent = state->second->first;
-            HWND* pWorkerW = state->second->second;
+//         EnumWindows([](HWND hwnd, LPARAM lParam) -> BOOL
+//         {
+//             auto* state = reinterpret_cast<std::pair<bool*, std::pair<HWND, HWND*>*>*>(lParam);
+//             bool& foundDefViewParent = *state->first;
+//             HWND defViewParent = state->second->first;
+//             HWND* pWorkerW = state->second->second;
             
-            if (hwnd == defViewParent)
-            {
-                foundDefViewParent = true;
-                return TRUE;
-            }
+//             if (hwnd == defViewParent)
+//             {
+//                 foundDefViewParent = true;
+//                 return TRUE;
+//             }
 
-            if (foundDefViewParent)
-            {
-                wchar_t cls[64];
-                GetClassNameW(hwnd, cls, 64);
-                if (wcscmp(cls, L"WorkerW") == 0)
-                {
-                    *pWorkerW = hwnd;
-                    return FALSE;
-                }
-            }
+//             if (foundDefViewParent)
+//             {
+//                 wchar_t cls[64];
+//                 GetClassNameW(hwnd, cls, 64);
+//                 if (wcscmp(cls, L"WorkerW") == 0)
+//                 {
+//                     *pWorkerW = hwnd;
+//                     return FALSE;
+//                 }
+//             }
 
-            return TRUE;
-        }, reinterpret_cast<LPARAM>(new std::pair<bool*, std::pair<HWND, HWND*>*>{
-            &foundDefViewParent, 
-            new std::pair<HWND, HWND*>{defViewParent, &workerW}
-        }));
+//             return TRUE;
+//         }, reinterpret_cast<LPARAM>(new std::pair<bool*, std::pair<HWND, HWND*>*>{
+//             &foundDefViewParent, 
+//             new std::pair<HWND, HWND*>{defViewParent, &workerW}
+//         }));
 
-        std::cout << "Non-raised desktop, WorkerW: " << workerW << std::endl;
-        return workerW;
-    }
-}
+//         std::cout << "Non-raised desktop, WorkerW: " << workerW << std::endl;
+//         return workerW;
+//     }
+// }
 
 void SetWindowTransparency(HWND hwnd, BYTE alpha = 255)
 {
@@ -353,187 +353,134 @@ void TestSimpleWindow()
     }
 }
 
-void AttachGLFWWindowToWallpaper(HWND hwnd)
-{
-    std::cout << "\n=== ATTACHING WINDOW TO DESKTOP ===\n";
-    
-    // SpawnWorkerW();
-    Sleep(200);
-    
-    HWND progman = FindWindowW(L"Progman", nullptr);
-    HWND shellDLL_DefView = FindWindowExW(progman, nullptr, L"SHELLDLL_DefView", nullptr);
-    HWND workerW = GetWallpaperWorkerW();
-    
-    std::cout << "Progman: " << progman << std::endl;
-    std::cout << "SHELLDLL_DefView: " << shellDLL_DefView << std::endl;
-    std::cout << "WorkerW: " << workerW << std::endl;
-    
-    if (!workerW)
-    {
-        std::cerr << "Failed to locate WorkerW\n";
-        return;
-    }
-    
-    bool isRaisedDesktop = HasExtendedStyle(progman, WS_EX_NOREDIRECTIONBITMAP);
-    std::cout << "Is raised desktop: " << (isRaisedDesktop ? "YES" : "NO") << std::endl;
-    
-    if (isRaisedDesktop)
-    {
-        std::cout << "\n=== RAISED DESKTOP SETUP ===\n";
-        
-        // Check and set DPI awareness before changing parent
-        // Get DPI awareness of both windows
-        std::cout << "Checking DPI awareness...\n";
-        
-        // Windows 10 1607+ has per-monitor DPI awareness V2
-        // We need to ensure our window matches the desktop's DPI awareness
-        typedef DPI_AWARENESS_CONTEXT (WINAPI *GetWindowDpiAwarenessContextProc)(HWND);
-        typedef BOOL (WINAPI *AreDpiAwarenessContextsEqualProc)(DPI_AWARENESS_CONTEXT, DPI_AWARENESS_CONTEXT);
-        
-        HMODULE user32 = GetModuleHandleA("user32.dll");
-        auto pGetWindowDpiAwarenessContext = (GetWindowDpiAwarenessContextProc)GetProcAddress(user32, "GetWindowDpiAwarenessContext");
-        auto pAreDpiAwarenessContextsEqual = (AreDpiAwarenessContextsEqualProc)GetProcAddress(user32, "AreDpiAwarenessContextsEqual");
-        
-        if (pGetWindowDpiAwarenessContext && pAreDpiAwarenessContextsEqual)
-        {
-            DPI_AWARENESS_CONTEXT hwndContext = pGetWindowDpiAwarenessContext(hwnd);
-            DPI_AWARENESS_CONTEXT progmanContext = pGetWindowDpiAwarenessContext(progman);
-            
-            if (!pAreDpiAwarenessContextsEqual(hwndContext, progmanContext))
-            {
-                std::cout << "WARNING: DPI awareness mismatch detected!\n";
-                std::cout << "This may cause unexpected behavior.\n";
-            }
-            else
-            {
-                std::cout << "DPI awareness contexts match - OK\n";
-            }
-        }
-        
-        // Step 1: Modify styles BEFORE SetParent (as per documentation)
-        std::cout << "Step 1: Modifying window styles...\n";
-        
-        LONG_PTR style = GetWindowLongPtr(hwnd, GWL_STYLE);
-        std::cout << "  Original style: 0x" << std::hex << style << std::dec << "\n";
-        
-        // Clear WS_POPUP and overlapped styles
-        style &= ~(WS_OVERLAPPEDWINDOW | WS_POPUP);
-        // Set WS_CHILD style (required before SetParent to non-NULL parent)
-        style |= WS_CHILD | WS_VISIBLE;
-        
-        SetWindowLongPtr(hwnd, GWL_STYLE, style);
-        std::cout << "  New style: 0x" << std::hex << style << std::dec << "\n";
-        std::cout << "  WS_POPUP cleared, WS_CHILD set\n";
-        
-        // Step 2: Set extended styles
-        std::cout << "Step 2: Setting extended styles...\n";
-        
-        LONG_PTR exStyle = GetWindowLongPtr(hwnd, GWL_EXSTYLE);
-        exStyle |= WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE;
-        exStyle &= ~WS_EX_APPWINDOW;
-        SetWindowLongPtr(hwnd, GWL_EXSTYLE, exStyle);
-        std::cout << "  Extended styles set\n";
-        
-        // Step 3: Get UI state from parent before SetParent
-        std::cout << "Step 3: Synchronizing UI state...\n";
-        
-        LRESULT progmanUIState = SendMessage(progman, WM_QUERYUISTATE, 0, 0);
-        std::cout << "  Progman UI state: 0x" << std::hex << progmanUIState << std::dec << "\n";
-        
-        // Step 4: Now call SetParent (styles are already set correctly)
-        std::cout << "Step 4: Setting parent to Progman...\n";
-        
-        HWND oldParent = SetParent(hwnd, progman);
-        if (!oldParent && GetLastError() != 0)
-        {
-            std::cerr << "Failed to set parent: " << GetLastError() << std::endl;
-            return;
-        }
-        std::cout << "  Parent set successfully (old parent: " << oldParent << ")\n";
-        
-        // Step 5: Synchronize UI state after SetParent (as per documentation)
-        std::cout << "Step 5: Updating UI state...\n";
-        
-        SendMessage(hwnd, WM_UPDATEUISTATE, 
-                   MAKEWPARAM(UIS_INITIALIZE, UISF_HIDEACCEL | UISF_HIDEFOCUS), 0);
-        
-        // Apply the parent's UI state to our window
-        if (progmanUIState != 0)
-        {
-            SendMessage(hwnd, WM_CHANGEUISTATE, progmanUIState, 0);
-        }
-        std::cout << "  UI state synchronized\n";
-        
-        // Step 6: Position the window
-        std::cout << "Step 6: Positioning window...\n";
-        
-        RECT rc;
-        GetClientRect(progman, &rc);
-        std::cout << "  Progman client rect: " << rc.right << "x" << rc.bottom << "\n";
-        
-        // Try positioning below SHELLDLL_DefView
-        UINT uFlags = SWP_NOACTIVATE | SWP_SHOWWINDOW | SWP_FRAMECHANGED;
-        
-        std::cout << "  Attempting to position above WorkerW (below DefView)...\n";
-        if (!SetWindowPos(hwnd, workerW,
-                         0, 0, rc.right, rc.bottom, uFlags))
-        {
-            DWORD err = GetLastError();
-            std::cerr << "  SetWindowPos failed: " << err << std::endl;
-        }
-        else
-        {
-            std::cout << "  Window positioned successfully\n";
-        }
-        
-        // Step 7: Ensure WorkerW stays at bottom
-        std::cout << "Step 7: Ensuring WorkerW z-order...\n";
-        EnsureWorkerWZOrder(progman, workerW, isRaisedDesktop);
-        
-        // Step 8: Force redraw
-        std::cout << "Step 8: Forcing window update...\n";
-        ShowWindow(hwnd, SW_SHOW);
-        InvalidateRect(hwnd, NULL, TRUE);
-        UpdateWindow(hwnd);
-        
-        std::cout << "\n=== SETUP COMPLETE ===\n";
-        std::cout << "Expected z-order (top to bottom):\n";
-        std::cout << "  1. SHELLDLL_DefView (icons visible)\n";
-        std::cout << "  2. Your window (wallpaper)\n";
-        std::cout << "  3. WorkerW (bottom)\n";
-    }
-    else
-    {
-        // Normal desktop (non-raised)
-        std::cout << "\n=== NORMAL DESKTOP SETUP ===\n";
-        
-        LONG_PTR style = GetWindowLongPtr(hwnd, GWL_STYLE);
-        style &= ~(WS_OVERLAPPEDWINDOW | WS_POPUP);
-        style |= WS_CHILD | WS_VISIBLE;
-        SetWindowLongPtr(hwnd, GWL_STYLE, style);
+// HWND FindShellDefView(HWND progman)
+// {
+//     HWND shellView = nullptr;
 
-        LONG_PTR exStyle = GetWindowLongPtr(hwnd, GWL_EXSTYLE);
-        exStyle |= WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE;
-        exStyle &= ~WS_EX_APPWINDOW;
-        SetWindowLongPtr(hwnd, GWL_EXSTYLE, exStyle);
+//     // 1) Try direct child
+//     shellView = FindWindowExW(progman, nullptr, L"SHELLDLL_DefView", nullptr);
+//     if (shellView)
+//         return shellView;
 
-        // Synchronize UI state
-        LRESULT workerUIState = SendMessage(workerW, WM_QUERYUISTATE, 0, 0);
-        
-        SetParent(hwnd, workerW);
-        
-        SendMessage(hwnd, WM_UPDATEUISTATE, 
-                   MAKEWPARAM(UIS_INITIALIZE, UISF_HIDEACCEL | UISF_HIDEFOCUS), 0);
-        if (workerUIState != 0)
-        {
-            SendMessage(hwnd, WM_CHANGEUISTATE, workerUIState, 0);
-        }
+//     // 2) Walk WorkerWs (some builds hide it there)
+//     HWND worker = nullptr;
+//     while ((worker = FindWindowExW(nullptr, worker, L"WorkerW", nullptr)))
+//     {
+//         shellView = FindWindowExW(worker, nullptr, L"SHELLDLL_DefView", nullptr);
+//         if (shellView)
+//             return shellView;
+//     }
 
-        RECT rc;
-        GetClientRect(workerW, &rc);
-        SetWindowPos(hwnd, HWND_BOTTOM, 0, 0, rc.right - rc.left, rc.bottom - rc.top,
-                    SWP_NOACTIVATE | SWP_SHOWWINDOW);
-        
-        std::cout << "Setup complete\n";
-    }
-}
+//     return nullptr;
+// }
+
+// HWND FindWorkerW(HWND progman)
+// {
+//     HWND worker = nullptr;
+
+//     while ((worker = FindWindowExW(nullptr, worker, L"WorkerW", nullptr)))
+//     {
+//         // We want the WorkerW *behind* icons
+//         if (!FindWindowExW(worker, nullptr, L"SHELLDLL_DefView", nullptr))
+//             return worker;
+//     }
+
+//     return nullptr;
+// }
+
+// bool HasExtendedStyle(HWND hwnd, DWORD exStyle)
+// {
+//     return (GetWindowLongPtr(hwnd, GWL_EXSTYLE) & exStyle) != 0;
+// }
+
+// void AttachGLFWWindowToWallpaper(HWND hwnd)
+// {
+//     HINSTANCE hInstance = GetModuleHandle(nullptr);
+
+//     HWND progman = FindWindowW(L"Progman", nullptr);
+//     if (!progman)
+//     {
+//         std::cerr << "Progman not found\n";
+//         return;
+//     }
+
+//     bool isRaisedDesktop = HasExtendedStyle(progman, WS_EX_NOREDIRECTIONBITMAP);
+//     std::cout << "Is raised desktop: " << (isRaisedDesktop ? "YES" : "NO") << std::endl;
+
+//     // Always send this — harmless on older desktops
+//     SendMessageTimeoutW(
+//         progman,
+//         0x052C, // Progman spawn WorkerW
+//         0, 0,
+//         SMTO_NORMAL,
+//         100,
+//         nullptr
+//     );
+
+//     HWND shellView = FindShellDefView(progman);
+//     HWND workerW   = FindWorkerW(progman);
+
+//     std::cout << "ShellView: " << shellView << std::endl;
+//     std::cout << "WorkerW:   " << workerW   << std::endl;
+
+//     if (!shellView || !workerW)
+//     {
+//         std::cerr << "Failed to locate desktop components\n";
+//         return;
+//     }
+
+//     /* ---------------------------------------------------------
+//        1) Fix GLFW window styles
+//     --------------------------------------------------------- */
+//     LONG_PTR style   = GetWindowLongPtr(hwnd, GWL_STYLE);
+//     LONG_PTR exStyle = GetWindowLongPtr(hwnd, GWL_EXSTYLE);
+
+//     DWORD ex = WS_EX_LAYERED | WS_EX_NOACTIVATE;
+//     HWND hLiveWP = CreateWindowEx(
+//         0,
+//         "LiveWPClass",
+//         "",
+//         WS_CHILD,
+//         0, 0, 2560, 1440,
+//         progman,
+//         nullptr,
+//         hInstance,
+//         nullptr
+//     );
+
+//     SetLayeredWindowAttributes(hLiveWP, 0, 255, LWA_ALPHA);
+
+//     // SetWindowPos(
+//     //     hwnd,
+//     //     nullptr,
+//     //     0, 0,
+//     //     rc.right,
+//     //     rc.bottom,
+//     //     SWP_NOACTIVATE | SWP_NOZORDER | SWP_FRAMECHANGED
+//     // );
+
+//     /* ---------------------------------------------------------
+//        4) Z-order choreography (CRITICAL)
+//     --------------------------------------------------------- */
+
+//     // Place wallpaper ABOVE icons
+//     SetWindowPos(
+//         hLiveWP,
+//         shellView,
+//         0, 0, 0, 0,
+//         SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE
+//     );
+
+//     // Push WorkerW behind wallpaper
+//     SetWindowPos(
+//         workerW,
+//         hLiveWP,
+//         0, 0, 0, 0,
+//         SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE
+//     );
+
+//     ShowWindow(hLiveWP, SW_SHOW);
+//     // UpdateWindow(hwnd);
+
+//     std::cout << "GLFW window successfully attached under Progman\n";
+// }

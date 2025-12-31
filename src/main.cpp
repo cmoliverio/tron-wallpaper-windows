@@ -46,6 +46,14 @@
 #pragma comment(lib, "opengl32.lib")
 #pragma comment(lib, "gdi32.lib")
 
+// For DPI awareness functions
+#include <shellscalingapi.h>
+#pragma comment(lib, "Shlwapi.lib")
+
+// For PathFindFileNameW
+#include <shlwapi.h>
+#pragma comment(lib, "Shcore.lib")
+
 // #define WIDTH 960
 // int WIDTH = 1280;
 // int HEIGHT = 720;
@@ -74,24 +82,24 @@
 //     return glm::normalize(axis);
 // }
 
-// LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
-// {
-//     switch (msg)
-//     {
-//         case WM_DESTROY:
-//             PostQuitMessage(0);
-//             return 0;
-//         case WM_PAINT:
-//         {
-//             PAINTSTRUCT ps;
-//             BeginPaint(hwnd, &ps);
-//             EndPaint(hwnd, &ps);
-//             return 0;
-//         }
-//         default:
-//             return DefWindowProcW(hwnd, msg, wParam, lParam);
-//     }
-// }
+LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
+{
+    switch (msg)
+    {
+        case WM_DESTROY:
+            PostQuitMessage(0);
+            return 0;
+        case WM_PAINT:
+        {
+            PAINTSTRUCT ps;
+            BeginPaint(hwnd, &ps);
+            EndPaint(hwnd, &ps);
+            return 0;
+        }
+        default:
+            return DefWindowProcW(hwnd, msg, wParam, lParam);
+    }
+}
 
 #include <windows.h>
 #include <iostream>
@@ -101,7 +109,7 @@ HWND hShellDefView = NULL;
 
 // EnumChildWindows callback to locate the Desktop Icons window
 BOOL CALLBACK EnumChildProc(HWND hwnd, LPARAM lParam) {
-    char className;
+    LPSTR className;
     GetClassNameA(hwnd, className, 100);
 
     // Look for the class that holds desktop icons
@@ -165,157 +173,149 @@ void InjectWallpaperWindow(HWND hMyWallpaperWindow) {
     std::cout << "Wallpaper injected successfully under SHELLDLL_DefView." << std::endl;
 }
 
+HWND FindShellDefView(HWND progman)
+{
+    HWND shellView = nullptr;
+
+    // 1) Try direct child
+    shellView = FindWindowExW(progman, nullptr, L"SHELLDLL_DefView", nullptr);
+    if (shellView)
+        return shellView;
+
+    // 2) Walk WorkerWs (some builds hide it there)
+    HWND worker = nullptr;
+    while ((worker = FindWindowExW(nullptr, worker, L"WorkerW", nullptr)))
+    {
+        shellView = FindWindowExW(worker, nullptr, L"SHELLDLL_DefView", nullptr);
+        if (shellView)
+            return shellView;
+    }
+
+    return nullptr;
+}
+
+HWND FindWorkerW(HWND progman)
+{
+    HWND worker = nullptr;
+
+    while ((worker = FindWindowExW(nullptr, worker, L"WorkerW", nullptr)))
+    {
+        // We want the WorkerW *behind* icons
+        if (!FindWindowExW(worker, nullptr, L"SHELLDLL_DefView", nullptr))
+            return worker;
+    }
+
+    return nullptr;
+}
+
+bool HasExtendedStyle(HWND hwnd, DWORD exStyle)
+{
+    return (GetWindowLongPtr(hwnd, GWL_EXSTYLE) & exStyle) != 0;
+}
+
 int main()
 {
-    // Set DPI awareness FIRST (before any window creation)
-    typedef BOOL (WINAPI *SetProcessDpiAwarenessContextProc)(DPI_AWARENESS_CONTEXT);
-    HMODULE user32 = LoadLibraryA("user32.dll");
-    if (user32)
-    {
-        auto pSetProcessDpiAwarenessContext = (SetProcessDpiAwarenessContextProc)GetProcAddress(user32, "SetProcessDpiAwarenessContext");
-        if (pSetProcessDpiAwarenessContext)
-        {
-            // Set to per-monitor V2 (Windows 10 1703+)
-            if (pSetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2))
-            {
-                std::cout << "DPI Awareness set to Per-Monitor V2\n";
-            }
-            else
-            {
-                std::cout << "Failed to set DPI awareness, trying fallback...\n";
-                // Fallback to per-monitor aware
-                pSetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE);
-            }
-        }
-    }
-    // Setup console for debugging
-    AllocConsole();
-    FILE* fp;
-    freopen_s(&fp, "CONOUT$", "w", stdout);
-    std::cout << "=== OpenGL Wallpaper Starting ===\n";
-
     HINSTANCE hInstance = GetModuleHandle(nullptr);
 
-    // Register window class
-    WNDCLASSW wc = {};
-    wc.style = CS_OWNDC | CS_HREDRAW | CS_VREDRAW;
-    wc.lpfnWndProc = WndProc;
-    wc.hInstance = hInstance;
-    wc.lpszClassName = L"MyOpenGLClass";
-    wc.hCursor = LoadCursor(NULL, IDC_ARROW);
-    wc.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH);
-    
-    if (!RegisterClassW(&wc))
-    {
-        std::cerr << "Failed to register window class: " << GetLastError() << std::endl;
-        return -1;
+    HRESULT dpiAwarenessResult = SetProcessDpiAwareness(PROCESS_PER_MONITOR_DPI_AWARE);
+    if (FAILED(dpiAwarenessResult)) {
+        // Continue if needed, but coordinate values may be scaled.
     }
 
-    // Create window
-    int width = GetSystemMetrics(SM_CXSCREEN);
-    int height = GetSystemMetrics(SM_CYSCREEN);
-    
-    HWND hwnd = CreateWindowExW(
-        0,
-        L"MyOpenGLClass",
-        L"OpenGL Wallpaper",
-        WS_POPUP | WS_VISIBLE,
+
+    HWND progman = FindWindowW(L"Progman", nullptr);
+    if (!progman)
+    {
+        std::cerr << "Progman not found\n";
+        return 0;
+    }
+
+    bool isRaisedDesktop = HasExtendedStyle(progman, WS_EX_NOREDIRECTIONBITMAP);
+    std::cout << "Is raised desktop: " << (isRaisedDesktop ? "YES" : "NO") << std::endl;
+
+    // Always send this — harmless on older desktops
+    SendMessageTimeout(
+        progman,
+        0x052C, // Progman spawn WorkerW
         0, 0,
-        width, height,
-        nullptr,
+        SMTO_NORMAL,
+        1000,
+        nullptr
+    );
+
+    // Try to locate the Shell view (desktop icons) and WorkerW child directly under Progman
+    HWND shellView = FindWindowEx(progman, NULL, "SHELLDLL_DefView", NULL);
+    HWND workerW = FindWindowEx(progman, NULL, "WorkerW", NULL);
+
+    std::cout << "ShellView: " << shellView << std::endl;
+    std::cout << "WorkerW:   " << workerW   << std::endl;
+
+    if (!shellView || !workerW)
+    {
+        std::cerr << "Failed to locate desktop components\n";
+        return 0;
+    }
+
+    DWORD ex = WS_EX_LAYERED | WS_EX_NOACTIVATE;
+    HWND hLiveWP = CreateWindowEx(
+        ex,
+        "LiveWPClass",
+        "",
+        WS_CHILD,
+        0, 0, 2560, 1440,
+        progman,
         nullptr,
         hInstance,
         nullptr
     );
 
-    if (!hwnd)
-    {
-        std::cerr << "Failed to create window: " << GetLastError() << std::endl;
-        return -1;
-    }
+    // Prepare the engine window to be a layered child of Progman
+    LONG_PTR style = GetWindowLongPtr(hLiveWP, GWL_STYLE);
+    style &= ~(WS_OVERLAPPEDWINDOW); // Remove decorations
+    style |= WS_CHILD; // Child style required for SetParent
+    SetWindowLongPtr(hLiveWP, GWL_STYLE, style);
 
-    std::cout << "Window created: " << hwnd << std::endl;
-    ShowWindow(hwnd, SW_SHOW);
-    UpdateWindow(hwnd);
+    LONG_PTR exStyle = GetWindowLongPtr(hLiveWP, GWL_EXSTYLE);
+    exStyle |= WS_EX_LAYERED; // Make it a layered window for 24H2
+    SetWindowLongPtr(hLiveWP, GWL_EXSTYLE, exStyle);
+    SetLayeredWindowAttributes(hLiveWP, 0, 255, LWA_ALPHA);
 
-    // Setup OpenGL context
-    HDC hdc = GetDC(hwnd);  // <-- HDC defined here
-    if (!hdc)
-    {
-        std::cerr << "Failed to get DC: " << GetLastError() << std::endl;
-        return -1;
-    }
-    std::cout << "Got DC: " << hdc << std::endl;
+    // Reparent the engine window directly to Progman
+    SetParent(hLiveWP, progman);
 
-    PIXELFORMATDESCRIPTOR pfd = {};
-    pfd.nSize = sizeof(pfd);
-    pfd.nVersion = 1;
-    pfd.dwFlags = PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER;
-    pfd.iPixelType = PFD_TYPE_RGBA;
-    pfd.cColorBits = 32;
-    pfd.cDepthBits = 24;
-    pfd.cStencilBits = 8;
-    pfd.iLayerType = PFD_MAIN_PLANE;
+    // Place wallpaper ABOVE icons
+    SetWindowPos(
+        hLiveWP,
+        shellView,
+        0, 0, 0, 0,
+        SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE
+    );
 
-    int pf = ChoosePixelFormat(hdc, &pfd);
-    if (!pf)
-    {
-        std::cerr << "ChoosePixelFormat failed: " << GetLastError() << std::endl;
-        return -1;
-    }
-    std::cout << "Chose pixel format: " << pf << std::endl;
+    // Push WorkerW behind wallpaper
+    SetWindowPos(
+        workerW,
+        hLiveWP,
+        0, 0, 0, 0,
+        SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE
+    );
 
-    if (!SetPixelFormat(hdc, pf, &pfd))
-    {
-        std::cerr << "SetPixelFormat failed: " << GetLastError() << std::endl;
-        return -1;
-    }
-    std::cout << "Set pixel format\n";
+    // Resize/reposition the engine window to match its new parent.
+    // g_progmanWindowHandle spans the entire virtual desktop in modern builds
+    // SetWindowPos(
+    //     hLiveWP,
+    //     NULL,
+    //     0,
+    //     0,
+    //     2560,
+    //     1440,
+    //     SWP_NOZORDER | SWP_NOACTIVATE
+    // );
 
-    HGLRC glContext = wglCreateContext(hdc);
-    if (!glContext)
-    {
-        std::cerr << "wglCreateContext failed: " << GetLastError() << std::endl;
-        return -1;
-    }
-    std::cout << "Created GL context: " << glContext << std::endl;
+    // RedrawWindow(hLiveWP, NULL, NULL, RDW_INVALIDATE | RDW_UPDATENOW);
 
-    if (!wglMakeCurrent(hdc, glContext))
-    {
-        std::cerr << "wglMakeCurrent failed: " << GetLastError() << std::endl;
-        return -1;
-    }
-    std::cout << "Made context current\n";
+    // ShowWindow(hLiveWP, SW_SHOW);
 
-    // Test render
-    std::cout << "Testing basic rendering...\n";
-    ::glClearColor(1.0f, 0.0f, 0.0f, 1.0f);
-    ::glClear(GL_COLOR_BUFFER_BIT);
-    ::SwapBuffers(hdc);
-    
-    std::cout << "Test render complete - you should see RED screen for 2 seconds\n";
-
-    // Attach to wallpaper
-    std::cout << "\n=== Attaching to desktop ===\n";
-    AttachGLFWWindowToWallpaper(hwnd);
-    
-    // Check if we're in layered mode
-    LONG_PTR exStyle = GetWindowLongPtr(hwnd, GWL_EXSTYLE);
-    bool isLayered = (exStyle & WS_EX_LAYERED) != 0;
-    
-    std::cout << "Window is layered: " << (isLayered ? "YES" : "NO") << std::endl;
-    
-    // Get window dimensions
-    RECT rcWindow;
-    GetClientRect(hwnd, &rcWindow);
-    width = rcWindow.right;
-    height = rcWindow.bottom;
-    
-    std::cout << "\n=== Starting render loop ===\n";
-    if (isLayered)
-    {
-        std::cout << "Using UpdateLayeredWindow mode\n";
-    }
+    std::cout << "GLFW window successfully attached under Progman\n";
     
     MSG msg = {};
     bool running = true;
@@ -335,11 +335,6 @@ int main()
             TranslateMessage(&msg);
             DispatchMessage(&msg);
         }
-
-        if (!running) break;
-
-        // Render to OpenGL
-        glViewport(0, 0, width, height);
         
         float time = (GetTickCount() - startTime) / 1000.0f;
         float r = (float)((sin(time * 0.5) + 1.0) * 0.5);
@@ -350,20 +345,7 @@ int main()
         glClear(GL_COLOR_BUFFER_BIT);
         
         // Swap buffers to render
-        SwapBuffers(hdc);
-        
-        // If we're in layered mode, we need to manually update the layered window
-        if (isLayered)
-        {
-            // Update the layered window from our DC
-            if (!UpdateLayeredWindowFromDC(hwnd, hdc, width, height))
-            {
-                if (frameCount % 120 == 0) // Only log occasionally
-                {
-                    std::cerr << "UpdateLayeredWindow failed\n";
-                }
-            }
-        }
+        // SwapBuffers(hdc);
         
         frameCount++;
         if (frameCount % 120 == 0)
@@ -374,5 +356,4 @@ int main()
         Sleep(16); // ~60 FPS
     }
     
-    // ... cleanup ...
 }
