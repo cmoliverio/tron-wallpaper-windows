@@ -1,5 +1,5 @@
 #define GLFW_EXPOSE_NATIVE_WIN32
-// #include <glad/glad.h>
+#include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <GLFW/glfw3native.h>
 #include <iostream>
@@ -28,6 +28,7 @@ int main()
 		std::cout << "Failed to initialize GLFW" << std::endl;
 		return -1;
 	}
+
 
 	glfwWindowHint(GLFW_SCALE_TO_MONITOR, GLFW_TRUE);
 
@@ -72,19 +73,6 @@ int main()
         return 0;
     }
 
-    // DWORD ex = WS_EX_LAYERED | WS_EX_NOACTIVATE;
-    // HWND hLiveWP = CreateWindowEx(
-    //     ex,
-    //     "LiveWPClass",
-    //     "",
-    //     WS_CHILD,
-    //     0, 0, 2560, 1440,
-    //     progman,
-    //     nullptr,
-    //     hInstance,
-    //     nullptr
-    // );
-    //
 	// Create GLFW window with the size of the monitor.
 	GLFWwindow *window = glfwCreateWindow(
 		2560, 1440, "GLFW Wallpaper", nullptr, nullptr
@@ -97,6 +85,12 @@ int main()
 
 	// Make the window's context current.
 	glfwMakeContextCurrent(window);
+
+    int version = gladLoadGL();
+    if (version == 0) {
+        std::cerr << "Fucking broke" << std::endl;
+        std::exit(-1);
+    }
 
 	HWND hLiveWP = glfwGetWin32Window(window);
 

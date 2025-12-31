@@ -28,8 +28,8 @@ target_include_directories(tron_wallpaper
 
 target_link_libraries(tron_wallpaper
     PRIVATE
-        glfw
         glad::glad
+        glfw
         glm::glm
         opengl32
 )
