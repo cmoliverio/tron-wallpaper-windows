@@ -16,116 +16,10 @@
 #include <shlwapi.h>
 #pragma comment(lib, "Shcore.lib")
 
-// Global handle to store the found ShellDLL_DefView
-HWND hShellDefView = NULL;
-
-// EnumChildWindows callback to locate the Desktop Icons window
-BOOL CALLBACK EnumChildProc(HWND hwnd, LPARAM lParam) {
-    LPSTR className;
-    GetClassNameA(hwnd, className, 100);
-
-    // Look for the class that holds desktop icons
-    if (strcmp(className, "SHELLDLL_DefView") == 0) {
-        hShellDefView = hwnd;
-        return FALSE; // Stop enumerating
-    }
-    return TRUE;
-}
-
-void InjectWallpaperWindow(HWND hMyWallpaperWindow) {
-    // 1. Find the Program Manager window
-    HWND hProgman = FindWindowA("Progman", NULL);
-    if (!hProgman) {
-        std::cerr << "Error: Could not find Progman." << std::endl;
-        return;
-    }
-
-    // 2. Trigger the "Raised Desktop" state (Optional but recommended)
-    // This undocumented message ensures the desktop composition hierarchy is initialized.
-    // Even in 24H2, this helps ensure Progman is ready to accept children.
-    SendMessageTimeoutA(hProgman, 0x052C, 0, 0, SMTO_NORMAL, 1000, nullptr);
-
-    // 3. Locate the "SHELLDLL_DefView" (Desktop Icons)
-    // In 24H2, this is often a direct child of Progman or the Desktop.
-    // We search specifically under Progman first.
-    EnumChildWindows(hProgman, EnumChildProc, 0);
-    
-    // Fallback: If not found under Progman, search the entire desktop
-    if (!hShellDefView) {
-        HWND hDesktop = GetDesktopWindow();
-        EnumChildWindows(hDesktop, EnumChildProc, 0);
-    }
-
-    if (!hShellDefView) {
-        std::cerr << "Error: Could not find SHELLDLL_DefView." << std::endl;
-        return;
-    }
-
-    // 4. Configure Your Window Style
-    // 24H2 requires the child to be WS_EX_LAYERED to compose correctly in the stack.
-    LONG_PTR exStyle = GetWindowLongPtr(hMyWallpaperWindow, GWL_EXSTYLE);
-    SetWindowLongPtr(hMyWallpaperWindow, GWL_EXSTYLE, exStyle | WS_EX_LAYERED);
-    
-    // Ensure the window is visible/opaque
-    // LWA_ALPHA with 255 makes it fully opaque.
-    SetLayeredWindowAttributes(hMyWallpaperWindow, 0, 255, LWA_ALPHA);
-
-    // 5. Re-parent Your Window to Progman
-    // Instead of parenting to a WorkerW, we attach directly to the manager.
-    SetParent(hMyWallpaperWindow, hProgman);
-
-    // 6. Fix Z-Order Injection
-    // Insert our window immediately BEHIND the icons (hShellDefView).
-    // flags: Do not resize, do not move, do not activate (steal focus).
-    SetWindowPos(hMyWallpaperWindow, 
-                 hShellDefView, // Place *under* this handle
-                 0, 0, 0, 0, 
-                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW);
-
-    std::cout << "Wallpaper injected successfully under SHELLDLL_DefView." << std::endl;
-}
-
-HWND FindShellDefView(HWND progman)
-{
-    HWND shellView = nullptr;
-
-    // 1) Try direct child
-    shellView = FindWindowExW(progman, nullptr, L"SHELLDLL_DefView", nullptr);
-    if (shellView)
-        return shellView;
-
-    // 2) Walk WorkerWs (some builds hide it there)
-    HWND worker = nullptr;
-    while ((worker = FindWindowExW(nullptr, worker, L"WorkerW", nullptr)))
-    {
-        shellView = FindWindowExW(worker, nullptr, L"SHELLDLL_DefView", nullptr);
-        if (shellView)
-            return shellView;
-    }
-
-    return nullptr;
-}
-
-HWND FindWorkerW(HWND progman)
-{
-    HWND worker = nullptr;
-
-    while ((worker = FindWindowExW(nullptr, worker, L"WorkerW", nullptr)))
-    {
-        // We want the WorkerW *behind* icons
-        if (!FindWindowExW(worker, nullptr, L"SHELLDLL_DefView", nullptr))
-            return worker;
-    }
-
-    return nullptr;
-}
-
-
 bool HasExtendedStyle(HWND hwnd, DWORD exStyle)
 {
     return (GetWindowLongPtr(hwnd, GWL_EXSTYLE) & exStyle) != 0;
 }
-
 
 int main()
 {
@@ -273,7 +167,7 @@ int main()
 		glfwSwapBuffers(window);
 		glfwPollEvents();
 
-		std::this_thread::sleep_for(std::chrono::milliseconds(100));
+		std::this_thread::sleep_for(std::chrono::milliseconds(16));
 	}
     
 }
