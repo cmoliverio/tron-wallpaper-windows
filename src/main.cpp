@@ -7,6 +7,12 @@
 #include <chrono>
 #include <thread>
 #include <cmath>
+#include <random>
+
+// graphics library mathematics
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
 
 // For DPI awareness functions
 #include <shellscalingapi.h>
@@ -15,6 +21,9 @@
 // // For PathFindFileNameW
 #include <shlwapi.h>
 #pragma comment(lib, "Shcore.lib")
+
+#include "shader.hpp"
+#include "tetrahedron.hpp"
 
 GLFWwindow *init_glfw_window(uint32_t width, uint32_t height)
 {
@@ -187,6 +196,23 @@ void attach_wallpaper_to_os(HWND window, uint32_t width, uint32_t height)
     }
 }
 
+glm::vec3 randomUnitAxis()
+{
+    static std::mt19937 rng{ std::random_device{}() };
+    static std::uniform_real_distribution<float> dist(-1.0f, 1.0f);
+
+    glm::vec3 axis;
+
+    do {
+        axis = glm::vec3(
+            dist(rng),
+            dist(rng),
+            dist(rng));
+    } while (glm::dot(axis, axis) < 1e-6f); // use dot instead of length2
+
+    return glm::normalize(axis);
+}
+
 int main()
 {
     // prepare Windows
@@ -209,26 +235,131 @@ int main()
     attach_wallpaper_to_os(hwnd, width, height);
 
     std::cout << "GLFW window successfully attached under Progman\n";
+
+    std::cout << "Renderer: " << glGetString(GL_RENDERER) << "\n";
+    std::cout << "OpenGL: " << glGetString(GL_VERSION) << "\n";
+
+    Shader normal_shader(
+        "vertex_shader.vert", 
+        "geometry_shader.geom",
+        "fragment_shader.frag"
+    );
+    normal_shader.use();
+
+    uint32_t num_of_objs = 100;
+
+    std::vector<Tetrahedron> tetrahedrons;
+    tetrahedrons.reserve(num_of_objs);
+
+    std::mt19937 rng{ std::random_device{}() };
+
+    // Spread in world space
+    std::uniform_real_distribution<float> distXY(-5.0f, 5.0f);
+    std::uniform_real_distribution<float> distZ(-15.f, -2.0f); // in front of camera at z=+3
+
+    for (int i = 0; i < num_of_objs; ++i)
+    {
+        glm::vec3 pos{
+            distXY(rng),
+            distXY(rng),
+            distZ(rng)
+        };
+
+        tetrahedrons.emplace_back(pos);
+        tetrahedrons[i].scale(glm::vec3(0.30f, 0.30f, 0.30f));
+    }
+
+    std::vector<glm::vec3> spinAxes;
+    spinAxes.reserve(num_of_objs);
+
+    for (int i = 0; i < num_of_objs; ++i)
+    {
+        spinAxes.push_back(randomUnitAxis());
+    }
+
+    std::vector<float> spinSpeeds;  // radians per frame
+    spinSpeeds.reserve(num_of_objs);
+
+    std::normal_distribution<float> spinDegDist(0.1f, 0.1f); // degrees
+    // std::mt19937 rng{ std::random_device{}() };
+
+    for (int i = 0; i < num_of_objs; ++i)
+    {
+        float spinDeg;
+
+        // Draw until within desired range (truncated normal)
+        do {
+            spinDeg = spinDegDist(rng);
+        } while (spinDeg < 0.01f || spinDeg > 0.2f);
+
+        spinSpeeds.push_back(glm::radians(spinDeg)); // convert to radians
+    }
+
+    glEnable(GL_DEPTH_TEST);
     
-	while (!glfwWindowShouldClose(window)) {
-		// // Animate background color to show frames are rendering.
-		double timeSeconds = glfwGetTime();
-		float pulse = 0.5f + 0.5f * std::sin(static_cast<float>(timeSeconds) * 2.0f);
-		glClearColor(0.08f + 0.12f * pulse, 0.15f + 0.25f * pulse, 0.25f + 0.35f * pulse, 1.0f);
-		glClear(GL_COLOR_BUFFER_BIT);
+    // Render loop
+    while (!glfwWindowShouldClose(window))
+    {
+        if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+            glfwSetWindowShouldClose(window, true);
 
-		// Ensure viewport matches framebuffer size (HiDPI aware)
-		int winW = 0, winH = 0;
-		int fbW = 0, fbH = 0;
-		glfwGetWindowSize(window, &winW, &winH);
-		glfwGetFramebufferSize(window, &fbW, &fbH);
-		glViewport(0, 0, fbW, fbH);
+        glClearColor(0.08f, 0.10f, 0.13f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+        normal_shader.use();
 
-		glfwSwapBuffers(window);
-		glfwPollEvents();
+        // view 
+        glm::mat4 view = glm::mat4(1.0f);
+        view = glm::translate(view, glm::vec3(0.0f, 0.0f, -3.0f));
+        int32_t view_loc = glGetUniformLocation(
+            normal_shader.ID,
+            "view"
+        );
+        if (view_loc == -1) {
+            std::cerr << "View uniform not found" << std::endl;
+        }
+        glUniformMatrix4fv(
+            view_loc,
+            1,
+            GL_FALSE,
+            glm::value_ptr(view)
+        );
 
-		std::this_thread::sleep_for(std::chrono::milliseconds(7));
-	}
-    
+        // projection
+        glm::mat4 projection = glm::perspective(
+            glm::radians(45.0f), 
+            (float)width / (float)height, // not sure what this is tbh
+            0.1f,  // near clipping distance
+            100.0f // far clipping distance
+        );
+        int32_t projection_loc = glGetUniformLocation(
+            normal_shader.ID,
+            "projection"
+        );
+        if (projection_loc == -1) {
+            std::cerr << "Projection uniform not found" << std::endl;
+        }
+        glUniformMatrix4fv(
+            projection_loc,
+            1, 
+            GL_FALSE,
+            glm::value_ptr(projection)
+        );
+
+        constexpr float spin = glm::radians(0.5f);
+
+        for (size_t i = 0; i < tetrahedrons.size(); ++i)
+        {
+            // then get the value for that triangle here and make the spin speed
+            tetrahedrons[i].rotate(spinSpeeds[i], spinAxes[i]);
+            tetrahedrons[i].draw(normal_shader, i);
+        }
+
+        glfwSwapBuffers(window);
+        glfwPollEvents();
+    }
+
+    glfwDestroyWindow(window);
+    glfwTerminate();
+    return 0;
 }
