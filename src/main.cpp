@@ -313,7 +313,10 @@ int main()
     );
 
     // create a light cycle here
-    LightCycle first_cycle(glm::vec3(-3.0f, 0.0f, -5.0f));
+    LightCycle first_cycle(glm::vec3(-3.0f, -0.5f, -5.0f));
+
+    std::chrono::steady_clock::time_point t0 = std::chrono::steady_clock::now();
+    t1 = t0;
     
     // Render loop
     while (!glfwWindowShouldClose(window))
@@ -416,6 +419,41 @@ int main()
             GL_FALSE,
             glm::value_ptr(projection)
         );
+
+        // model
+        // glm::mat4 model = glm::mat4(1.0f);
+        // int32_t model_loc = glGetUniformLocation(
+        //     light_cycle_shader.ID,
+        //     "model"
+        // );
+        // if (projection_loc == -1) {
+        //     std::cerr << "Model uniform not found" << std::endl;
+        // }
+        // glUniformMatrix4fv(
+        //     model_loc,
+        //     1, 
+        //     GL_FALSE,
+        //     glm::value_ptr(model)
+        // );
+
+        // move direction after set times
+        auto total_time_elapsed = 
+            std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t0);
+        if (total_time_elapsed.count() > 1000) {
+            first_cycle.change_direction(Direction::Down);
+        }
+        if (total_time_elapsed.count() > 2000) {
+            first_cycle.change_direction(Direction::Forward);
+        }
+        if (total_time_elapsed.count() > 3000) {
+            first_cycle.change_direction(Direction::Right);
+        }
+        if (total_time_elapsed.count() > 5000) {
+            first_cycle.change_direction(Direction::Backward);
+        }
+        if (total_time_elapsed.count() > 6000) {
+            first_cycle.change_direction(Direction::Right);
+        }
 
         // start rendering the light cycles here         
         first_cycle.move(elapsed.count());

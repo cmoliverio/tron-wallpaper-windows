@@ -28,7 +28,7 @@ inline glm::vec3 direction_vector(Direction d) {
 
 class LightCycle {
 public:
-    explicit LightCycle(const glm::vec3& startPos, float speed = 0.5f);
+    explicit LightCycle(const glm::vec3& startPos, float speed = 0.001f);
 
     void change_direction(Direction d);
     void change_direction_random();
@@ -36,14 +36,13 @@ public:
     void move(uint64_t elapsed_ms);
     void draw(Shader& shader) const;
 
-    float thickness = 0.15f;
+    float thickness = 0.01f;
 
 private:
     void push_point_if_needed();
 
     std::vector<glm::vec3> points;
     glm::vec3 direction;
-    glm::vec3 head_position;
 
     float speed;               // units per second
     float distance_since_last; // for segment spacing

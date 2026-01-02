@@ -4,9 +4,8 @@ layout(lines) in;
 layout(triangle_strip, max_vertices = 4) out;
 
 in vec3 vViewPos[];
-
 uniform mat4 projection;
-uniform float thickness;
+uniform float uThickness;
 
 void main()
 {
@@ -14,7 +13,7 @@ void main()
     vec3 p1 = vViewPos[1];
 
     vec3 dir = normalize(p1 - p0);
-    vec3 right = normalize(cross(dir, vec3(0,0,1))) * thickness;
+    vec3 right = normalize(cross(dir, vec3(0, 0, 1))) * uThickness;
 
     vec4 v0 = projection * vec4(p0 - right, 1.0);
     vec4 v1 = projection * vec4(p0 + right, 1.0);
