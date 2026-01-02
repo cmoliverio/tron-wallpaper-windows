@@ -246,7 +246,7 @@ int main()
     );
     normal_shader.use();
 
-    uint32_t num_of_objs = 100;
+    uint32_t num_of_objs = 400;
 
     std::vector<Tetrahedron> tetrahedrons;
     tetrahedrons.reserve(num_of_objs);
@@ -296,10 +296,21 @@ int main()
     }
 
     glEnable(GL_DEPTH_TEST);
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
+
+    std::chrono::steady_clock::time_point t1;
+    std::chrono::steady_clock::time_point t2;
     
     // Render loop
     while (!glfwWindowShouldClose(window))
     {
+        // measure time 
+        t2 = std::chrono::steady_clock::now();
+
+        auto elapsed = 
+            std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1);
+
         if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
             glfwSetWindowShouldClose(window, true);
 
@@ -346,17 +357,17 @@ int main()
             glm::value_ptr(projection)
         );
 
-        constexpr float spin = glm::radians(0.5f);
-
         for (size_t i = 0; i < tetrahedrons.size(); ++i)
         {
             // then get the value for that triangle here and make the spin speed
-            tetrahedrons[i].rotate(spinSpeeds[i], spinAxes[i]);
+            tetrahedrons[i].rotate(spinSpeeds[i] * elapsed.count(), spinAxes[i]);
             tetrahedrons[i].draw(normal_shader, i);
         }
 
         glfwSwapBuffers(window);
         glfwPollEvents();
+
+        t1 = t2;
     }
 
     glfwDestroyWindow(window);
