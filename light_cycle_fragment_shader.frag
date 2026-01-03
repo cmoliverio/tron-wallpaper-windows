@@ -42,5 +42,5 @@ void main()
     float depth = clip.z / clip.w;
     gl_FragDepth = depth * 0.5 + 0.5;
 
-    FragColor = vec4(0.1, 0.3, 0.9, 1.0);
+    FragColor = vec4(0.5, 1.0, 1.0, 1.0);
 }

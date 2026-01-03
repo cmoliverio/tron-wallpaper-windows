@@ -14,19 +14,40 @@ void main()
 {
     vec3 a = vViewPos[0];
     vec3 b = vViewPos[1];
-
+    
     vec3 dir = normalize(b - a);
-    vec3 viewDir = normalize(-a);   // camera is at origin in view space
-    float dist = max(0.001, -a.z);  // view-space depth
-    vec3 right = normalize(cross(dir, viewDir)) * uThickness * dist;
-
+    
+    // Vector from line midpoint to camera (at origin in view space)
+    vec3 midpoint = (a + b) * 0.5;
+    vec3 toCamera = normalize(-midpoint);
+    
+    // Create perpendicular to both the line and view direction
+    vec3 right = normalize(cross(dir, toCamera));
+    
+    // Handle parallel case
+    float rightLen = length(cross(dir, toCamera));
+    if (rightLen < 0.001) {
+        right = vec3(1.0, 0.0, 0.0);
+        if (abs(dot(dir, right)) > 0.9) {
+            right = vec3(0.0, 1.0, 0.0);
+        }
+        right = normalize(cross(dir, right));
+    }
+    
+    // Make quad much wider to encompass full capsule
+    float quadWidth = uThickness * 3.0;
+    vec3 offset = right * quadWidth;
+    
+    // Extend along line for spherical caps
+    vec3 extend = dir * uThickness * 1.5;
+    
     vec3 quad[4] = vec3[](
-        a - right,
-        a + right,
-        b - right,
-        b + right
+        a - offset - extend,
+        a + offset - extend,
+        b - offset + extend,
+        b + offset + extend
     );
-
+    
     for (int i = 0; i < 4; ++i)
     {
         fP = quad[i];
@@ -35,14 +56,5 @@ void main()
         gl_Position = projection * vec4(quad[i], 1.0);
         EmitVertex();
     }
-
-    // geometry shader, before EmitVertex
-    gl_Position = vec4(-0.5, -0.5, 0, 1); EmitVertex();
-    gl_Position = vec4( 0.5, -0.5, 0, 1); EmitVertex();
-    gl_Position = vec4(-0.5,  0.5, 0, 1); EmitVertex();
-    gl_Position = vec4( 0.5,  0.5, 0, 1); EmitVertex();
-    EndPrimitive();
-    return;
-
     EndPrimitive();
 }

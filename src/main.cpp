@@ -323,6 +323,9 @@ int main()
     std::chrono::steady_clock::time_point t0 = std::chrono::steady_clock::now();
     t1 = t0;
 
+    glm::mat4 view = glm::mat4(1.0f);
+    view = glm::translate(view, glm::vec3(0.0f, 0.0f, -3.0f));
+
     // Render loop
     while (!glfwWindowShouldClose(window))
     {
@@ -340,9 +343,8 @@ int main()
 
         normal_shader.use();
 
+        view = glm::translate(view, glm::vec3(-0.003f, 0.0f, 0.0f));
         // view
-        glm::mat4 view = glm::mat4(1.0f);
-        view = glm::translate(view, glm::vec3(0.0f, 0.0f, -3.0f));
         int32_t view_loc = glGetUniformLocation(
             normal_shader.ID,
             "view");
@@ -386,8 +388,8 @@ int main()
         light_cycle_shader.use();
 
         // view
-        view = glm::mat4(1.0f);
-        view = glm::translate(view, glm::vec3(0.0f, 0.0f, -3.0f));
+        // view = glm::mat4(1.0f);
+        // view = glm::translate(view, glm::vec3(0.0f, 0.0f, -3.0f));
         view_loc = glGetUniformLocation(
             light_cycle_shader.ID,
             "view");
