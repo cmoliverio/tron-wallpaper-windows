@@ -1,253 +1,468 @@
+#define GLFW_EXPOSE_NATIVE_WIN32
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
-#include <string>
-#include <iterator>
-#include <fstream>
-#include <sstream>
+#include <GLFW/glfw3native.h>
 #include <iostream>
+#include <algorithm>
+#include <chrono>
+#include <thread>
 #include <cmath>
+#include <random>
 
-// graphics library mathematics :) 
+// graphics library mathematics
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-// #include <shader_utils.hpp>
+// For DPI awareness functions
+#include <shellscalingapi.h>
+#pragma comment(lib, "Shlwapi.lib")
+
+// // For PathFindFileNameW
+#include <shlwapi.h>
+#pragma comment(lib, "Shcore.lib")
+
 #include "shader.hpp"
+#include "tetrahedron.hpp"
+#include "light_cycle.hpp"
 
-// #define WIDTH 960
-int WIDTH = 1280;
-int HEIGHT = 720;
-
-float sqrt_of_2 = std::sqrt(2.0f);
-float sqrt_of_3 = std::sqrt(3.0f);
-float sqrt_of_6 = std::sqrt(6.0f);
-
-float vertices[] = {
-    // position x y z                            // colors
-    0.0f, 1.0f, 0.0f,                               0.0f, 0.0f, 1.0f,
-    sqrt_of_3 / 2.0f, -0.5f, 0.0f,      1.0f, 0.0f, 0.0f,
-    -sqrt_of_3 / 2.0f, -0.5f, 0.0f,     0.0f, 1.0f, 0.0f
-};
-
-// float pyramid[] = {
-//     // positions                     // colors 
-//     0.0f, 1.0f, 0.0f,                   0.0f, 0.0f, 1.0f,
-//     sqrt_of_3 / 2.0f, -0.5f, 0.0f,      1.0f, 0.0f, 0.0f,
-//     -sqrt_of_3 / 2.0f, -0.5f, 0.0f,     0.0f, 1.0f, 0.0f
-// };
-
-float pyrdamid_vertices[] = {
-    // x y z 
-    0.0f, 0.0f, 1.0f,
-    2.0f * sqrt_of_2 / 3.0f, 0.0f, -1.0f / 3.0f,
-    -sqrt_of_2 / 3.0f, sqrt_of_6 / 3.0f, -1.0f / 3.0f,
-    -sqrt_of_2 / 3.0f, -sqrt_of_6 / 3.0f, -1.0f / 3.0f,
-};
-
-unsigned int pyramid_indices[] = {
-    // Side faces
-    0, 1, 2,
-    0, 2, 3,
-    0, 3, 1,
-
-    // Base face
-    1, 3, 2
-};
-
-
-static void framebuffer_size_callback(GLFWwindow *, int width, int height)
+GLFWwindow *init_glfw_window(uint32_t width, uint32_t height)
 {
-    WIDTH = width;
-    HEIGHT = height;
-    glViewport(0, 0, width, height);
+	if (!glfwInit()) {
+		std::cout << "Failed to initialize GLFW" << std::endl;
+        std::exit(-1);
+	}
+
+	GLFWwindow *window = glfwCreateWindow(
+		width, 
+        height, 
+        "GLFW Wallpaper", 
+        nullptr, 
+        nullptr
+	);
+	if (!window) {
+		std::cerr << "Failed to create GLFW window" << std::endl;
+        glfwTerminate();
+        std::exit(-1);
+	}
+
+	// Make the window's context current.
+	glfwMakeContextCurrent(window);
+
+    // time to add hints, this makes it expand
+	glfwWindowHint(GLFW_SCALE_TO_MONITOR, GLFW_TRUE);
+
+    int version = gladLoadGL();
+    if (version == 0) {
+        std::cerr << "Failed to load GLAD" << std::endl;
+        glfwDestroyWindow(window);
+        glfwTerminate();
+        std::exit(-1);
+    }
+
+    return window;
+}
+
+HWND get_progman()
+{
+    HWND progman = FindWindow("Progman", NULL);
+    if (!progman) { 
+        std::cerr << "Did not find progman.  Giving up." << std::endl;
+        std::exit(-1);
+    }
+    return progman;
+}
+
+void init_os()
+{
+    // Set the process DPI awareness to get physical pixel coordinates.
+    HRESULT result = SetProcessDpiAwareness(PROCESS_PER_MONITOR_DPI_AWARE);
+    if (FAILED(result)) {
+        // do nothing, scaling might be broken though
+    }
+
+    HWND progman = get_progman();
+
+    // creates WorkerW window, required for pre 24H2, no effect post 24H2
+    SendMessageTimeout(
+        progman,
+        0x052C, // UNDOCUMENTED, this is a magic number which can break anytime 
+        0, 
+        0,
+        SMTO_NORMAL,
+        1000,
+        nullptr
+    );
+}
+
+void attach_24h2_or_newer(HWND window, uint32_t width, uint32_t height)
+{
+    HWND progman = get_progman();
+
+    // prepare the engine window to be a layered child of Progman
+    LONG_PTR style = GetWindowLongPtr(window, GWL_STYLE);
+    style &= ~(WS_OVERLAPPEDWINDOW); // remove decorations
+    style |= WS_CHILD; // child required for SetParent
+    SetWindowLongPtr(window, GWL_STYLE, style);
+
+    LONG_PTR exStyle = GetWindowLongPtr(window, GWL_EXSTYLE);
+    exStyle |= WS_EX_LAYERED; // make it a layered window for 24H2 or newer
+    SetWindowLongPtr(window, GWL_EXSTYLE, exStyle);
+
+    // set fully opaque
+    SetLayeredWindowAttributes(window, 0, 255, LWA_ALPHA);
+
+    // parent to progman
+    SetParent(window, progman);
+
+    HWND shell = FindWindowEx(progman, NULL, "SHELLDLL_DefView", NULL);
+    if (!shell) { 
+        std::cerr << "WARNING: Missing SHELLDLL_DefView\n" 
+            << "The wallpaper might cover desktop icons..."
+            << std::endl;
+    } else {
+        // move below SHELLDLL_DefView
+        SetWindowPos(
+            window,
+            shell,
+            0, 0, 
+            0, 0,
+            (SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE)
+        );
+    }
+
+    // resize/reposition the engine window to match progman
+    SetWindowPos(
+        window,
+        NULL,
+        0,
+        0,
+        width,
+        height,
+        (SWP_NOZORDER | SWP_NOACTIVATE)
+    );
+}
+
+BOOL CALLBACK EnumWindowsProc(HWND hwnd, LPARAM lParam)
+{
+    HWND shell = FindWindowEx(hwnd, NULL, "SHELLDLL_DefView", NULL);
+    if (shell != NULL) {
+        HWND* workerW = reinterpret_cast<HWND*>(lParam);
+        *workerW = FindWindowEx(NULL, hwnd, "WorkerW", NULL);
+        return FALSE; // stop
+    }
+    return TRUE; // continue
+};
+
+void attach_pre_24h2(HWND window)
+{
+    HWND workerW = nullptr;
+
+    // find WorkerW
+    EnumWindows(EnumWindowsProc, reinterpret_cast<LPARAM>(&workerW));
+    if (!workerW)
+    {
+        std::cerr << "Failed to locate WorkerW\n";
+        std::exit(-1);
+    }
+
+    // set extended style as child and remove overlapping
+    LONG_PTR style = GetWindowLongPtr(window, GWL_STYLE);
+    style &= ~(WS_OVERLAPPEDWINDOW);
+    style |= WS_CHILD; // MUST be a child
+    SetWindowLongPtr(window, GWL_STYLE, style);
+
+    SetParent(window, workerW);
+}
+
+void attach_wallpaper_to_os(HWND window, uint32_t width, uint32_t height)
+{
+    HWND progman = get_progman();
+
+    // this determines whether the windows version is before or after 24H2
+    // since that is when Microsoft introduced breaking changes to the 
+    // window structure. this change included a critical style flag recognized 
+    // as WS_EX_NOREDIRECTIONBITMAP. run spyxx.exe for more info:
+    // (comes with Visual Studio)
+    // C:/Program Files/Microsoft Visual Studio/<vrsn>/<dstrbtn>/Common7/Tools/spyxx.exe
+    LONG_PTR extended_style = GetWindowLongPtr(progman, GWL_EXSTYLE);
+    bool is_raised_desktop = (extended_style & WS_EX_NOREDIRECTIONBITMAP) != 0;
+
+    if (is_raised_desktop) {
+        std::cout << "Assuming 24H2 Windows or newer..."  << std::endl;
+        attach_24h2_or_newer(window, width, height);
+    } else {
+        std::cout << "Assuming pre 24H2 Windows..."  << std::endl;
+        attach_pre_24h2(window);
+    }
+}
+
+glm::vec3 randomUnitAxis()
+{
+    static std::mt19937 rng{ std::random_device{}() };
+    static std::uniform_real_distribution<float> dist(-1.0f, 1.0f);
+
+    glm::vec3 axis;
+
+    do {
+        axis = glm::vec3(
+            dist(rng),
+            dist(rng),
+            dist(rng));
+    } while (glm::dot(axis, axis) < 1e-6f); // use dot instead of length2
+
+    return glm::normalize(axis);
 }
 
 int main()
 {
-    if (!glfwInit())
-    {
-        std::cerr << "Failed to initialize GLFW\n";
-        return -1;
-    }
+    // prepare Windows
+    // init_os();
+    
+    // get (main) monitor dimensions
+    uint32_t width = 1280;
+    uint32_t height = 720;
+    // uint32_t width  = GetSystemMetrics(SM_CXSCREEN);
+    // uint32_t height = GetSystemMetrics(SM_CYSCREEN);
 
-    // OpenGL 3.3 Core (well-supported on Windows)
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    GLFWwindow *window = init_glfw_window(width, height);
+    
+    // get the windows handle
+    // HWND hwnd = glfwGetWin32Window(window);
+    // if (!hwnd) {
+    //     std::cerr << "Could not get Windows handle from GLFW" << std::endl;
+    //     std::exit(-1);
+    // }
 
-    GLFWwindow *window = glfwCreateWindow(
-        WIDTH, HEIGHT,
-        "OpenGL Windows App",
-        nullptr,
-        nullptr);
+    // set as background
+    // attach_wallpaper_to_os(hwnd, width, height);
 
-    if (!window)
-    {
-        std::cerr << "Failed to create window\n";
-        glfwTerminate();
-        return -1;
-    }
-
-    glfwMakeContextCurrent(window);
-    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
-
-    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
-    {
-        std::cerr << "Failed to initialize GLAD\n";
-        return -1;
-    }
+    std::cout << "GLFW window successfully attached under Progman\n";
 
     std::cout << "Renderer: " << glGetString(GL_RENDERER) << "\n";
     std::cout << "OpenGL: " << glGetString(GL_VERSION) << "\n";
 
-    uint32_t VAO, VBO, EBO;
-
-    glGenVertexArrays(1, &VAO);
-    glGenBuffers(1, &VBO);
-    glGenBuffers(1, &EBO);
-
-    glBindVertexArray(VAO);
-
-    // Vertex buffer
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, 
-        sizeof(pyrdamid_vertices), 
-        pyrdamid_vertices, 
-        GL_STATIC_DRAW);
-
-    // Index buffer
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, 
-        sizeof(pyramid_indices), 
-        pyramid_indices, 
-        GL_STATIC_DRAW);
-
-    // Vertex attribute
-    glVertexAttribPointer(
-        0,                      // location
-        3,                      // vec3
-        GL_FLOAT,
-        GL_FALSE,
-        3 * sizeof(float),
-        (void*)0
+    Shader normal_shader(
+        "vertex_shader.vert", 
+        "geometry_shader.geom",
+        "fragment_shader.frag"
     );
-    glEnableVertexAttribArray(0);
-
-    glBindVertexArray(0);
-
-    // uint32_t VBO;
-    // uint32_t VAO;
-    // glGenBuffers(1, &VBO);
-    // glGenVertexArrays(1, &VAO);
-
-    // glBindVertexArray(VAO);
-    // glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    // glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-
-    // for(int i = 0; i < 4; i++){
-    //     int first = (i + 0) * (i + 1);
-    //     int second = (i + 1) * (i + 1);
-    //     int third = (i + 2) * (i + 1);
-
-
-    // }
-
-    // move trinagle data in there
-    // glBindVertexArray(VAO);
-    // glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    // glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-
-    // glVertexAttribPointer(0,
-    //                       3,
-    //                       GL_FLOAT,
-    //                       GL_FALSE,
-    //                       3 * sizeof(float),
-    //                       (void *)0);
-    // glEnableVertexAttribArray(0);
-    // glVertexAttribPointer(1,
-    //                       3,
-    //                       GL_FLOAT,
-    //                       GL_FALSE,
-    //                       3 * sizeof(float),
-    //                       (void *)(3 * sizeof(float)));
-    // glEnableVertexAttribArray(1);
-
-    Shader normal_shader("vertex_shader.vert", "fragment_shader.frag");
     normal_shader.use();
-    
-    int32_t viewport_sizes = glGetUniformLocation(
-        normal_shader.ID, 
-        "viewport_size"
+
+    uint32_t num_of_objs = 20;
+
+    std::vector<Tetrahedron> tetrahedrons;
+    tetrahedrons.reserve(num_of_objs);
+
+    std::mt19937 rng{ std::random_device{}() };
+
+    // Spread in world space
+    std::uniform_real_distribution<float> distXY(-5.0f, 5.0f);
+    std::uniform_real_distribution<float> distZ(-15.f, -2.0f); // in front of camera at z=+3
+
+    for (int i = 0; i < num_of_objs; ++i)
+    {
+        glm::vec3 pos{
+            distXY(rng),
+            distXY(rng),
+            distZ(rng)
+        };
+
+        tetrahedrons.emplace_back(pos);
+        tetrahedrons[i].scale(glm::vec3(0.30f, 0.30f, 0.30f));
+    }
+
+    std::vector<glm::vec3> spinAxes;
+    spinAxes.reserve(num_of_objs);
+
+    for (int i = 0; i < num_of_objs; ++i)
+    {
+        spinAxes.push_back(randomUnitAxis());
+    }
+
+    std::vector<float> spinSpeeds;  // radians per frame
+    spinSpeeds.reserve(num_of_objs);
+
+    std::normal_distribution<float> spinDegDist(0.1f, 0.1f); // degrees
+    // std::mt19937 rng{ std::random_device{}() };
+
+    for (int i = 0; i < num_of_objs; ++i)
+    {
+        float spinDeg;
+
+        // Draw until within desired range (truncated normal)
+        do {
+            spinDeg = spinDegDist(rng);
+        } while (spinDeg < 0.01f || spinDeg > 0.2f);
+
+        spinSpeeds.push_back(glm::radians(spinDeg)); // convert to radians
+    }
+
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
+
+    std::chrono::steady_clock::time_point t1;
+    std::chrono::steady_clock::time_point t2;
+
+    // light cycle shader
+    Shader light_cycle_shader(
+        "light_cycle_vertex_shader.vert",
+        "light_cycle_geometry_shader.geom",
+        "light_cycle_fragment_shader.frag"
     );
-    if(viewport_sizes == -1)
-        std::cerr << "Did not find viewport size variable" << std::endl;
 
-    glUniform2f(viewport_sizes, (float) WIDTH, (float) HEIGHT);
+    // create a light cycle here
+    LightCycle first_cycle(glm::vec3(-3.0f, -0.5f, -5.0f));
 
-    float rot_angle = 0.0f;
-
+    std::chrono::steady_clock::time_point t0 = std::chrono::steady_clock::now();
+    t1 = t0;
+    
     // Render loop
     while (!glfwWindowShouldClose(window))
     {
+        // measure time 
+        t2 = std::chrono::steady_clock::now();
+
+        auto elapsed = 
+            std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1);
+
         if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
             glfwSetWindowShouldClose(window, true);
 
         glClearColor(0.08f, 0.10f, 0.13f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         normal_shader.use();
 
-        viewport_sizes = glGetUniformLocation(
-            normal_shader.ID, 
-            "viewport_size"
-        );
-        if(viewport_sizes == -1)
-            std::cerr << "Did not find viewport size variable" << std::endl;
-        glUniform2f(viewport_sizes, (float) WIDTH, (float) HEIGHT);
-
-        glm::mat4 transform_matrix = glm::mat4(1.0f);
-        transform_matrix = glm::scale(
-            transform_matrix, 
-            glm::vec3(1.0f, 1.0f, 1.0f)
-        );
-        transform_matrix = glm::rotate(
-            transform_matrix,
-            glm::radians(rot_angle),
-            glm::vec3(rot_angle, 0.0f, rot_angle)
-        );
-
-        int32_t transform_uniform = glGetUniformLocation(
+        // view 
+        glm::mat4 view = glm::mat4(1.0f);
+        view = glm::translate(view, glm::vec3(0.0f, 0.0f, -3.0f));
+        int32_t view_loc = glGetUniformLocation(
             normal_shader.ID,
-            "transform"
+            "view"
         );
-
-        if(transform_uniform == -1) {
-            std::cerr << "Did not find a uniform" << std::endl;
+        if (view_loc == -1) {
+            std::cerr << "View uniform not found" << std::endl;
         }
-        transform_matrix = glm::scale(
-            transform_matrix, glm::vec3(0.75f, 0.75f, 0.75f)
-        );
-        transform_matrix = glm::rotate(
-            transform_matrix, 
-            glm::radians(rot_angle),
-            glm::vec3(0.0f, 0.0f, 1.0f)
-        );
         glUniformMatrix4fv(
-            transform_uniform, 
-            1, 
-            GL_FALSE, 
-            glm::value_ptr(transform_matrix)
+            view_loc,
+            1,
+            GL_FALSE,
+            glm::value_ptr(view)
         );
 
-        glBindVertexArray(VAO);
-        // glDrawArrays(GL_TRIANGLES, 0, 3);
-        glDrawElements(GL_TRIANGLES, 12, GL_UNSIGNED_INT, 0);
+        // projection
+        glm::mat4 projection = glm::perspective(
+            glm::radians(45.0f), 
+            (float)width / (float)height, // not sure what this is tbh
+            0.1f,  // near clipping distance
+            100.0f // far clipping distance
+        );
+        int32_t projection_loc = glGetUniformLocation(
+            normal_shader.ID,
+            "projection"
+        );
+        if (projection_loc == -1) {
+            std::cerr << "Projection uniform not found" << std::endl;
+        }
+        glUniformMatrix4fv(
+            projection_loc,
+            1, 
+            GL_FALSE,
+            glm::value_ptr(projection)
+        );
+
+        for (size_t i = 0; i < tetrahedrons.size(); ++i)
+        {
+            // then get the value for that triangle here and make the spin speed
+            tetrahedrons[i].rotate(spinSpeeds[i] * elapsed.count(), spinAxes[i]);
+            tetrahedrons[i].draw(normal_shader, i);
+        }
+
+        light_cycle_shader.use();
+
+        // view 
+        view = glm::mat4(1.0f);
+        view = glm::translate(view, glm::vec3(0.0f, 0.0f, -3.0f));
+        view_loc = glGetUniformLocation(
+            light_cycle_shader.ID,
+            "view"
+        );
+        if (view_loc == -1) {
+            std::cerr << "View uniform not found" << std::endl;
+        }
+        glUniformMatrix4fv(
+            view_loc,
+            1,
+            GL_FALSE,
+            glm::value_ptr(view)
+        );
+
+        // projection
+        projection = glm::perspective(
+            glm::radians(45.0f), 
+            (float)width / (float)height, // not sure what this is tbh
+            0.1f,  // near clipping distance
+            100.0f // far clipping distance
+        );
+        projection_loc = glGetUniformLocation(
+            light_cycle_shader.ID,
+            "projection"
+        );
+        if (projection_loc == -1) {
+            std::cerr << "Projection uniform not found" << std::endl;
+        }
+        glUniformMatrix4fv(
+            projection_loc,
+            1, 
+            GL_FALSE,
+            glm::value_ptr(projection)
+        );
+
+        // model
+        // glm::mat4 model = glm::mat4(1.0f);
+        // int32_t model_loc = glGetUniformLocation(
+        //     light_cycle_shader.ID,
+        //     "model"
+        // );
+        // if (projection_loc == -1) {
+        //     std::cerr << "Model uniform not found" << std::endl;
+        // }
+        // glUniformMatrix4fv(
+        //     model_loc,
+        //     1, 
+        //     GL_FALSE,
+        //     glm::value_ptr(model)
+        // );
+
+        // move direction after set times
+        auto total_time_elapsed = 
+            std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t0);
+        if (total_time_elapsed.count() > 1000) {
+            first_cycle.change_direction(Direction::Down);
+        }
+        if (total_time_elapsed.count() > 2000) {
+            first_cycle.change_direction(Direction::Forward);
+        }
+        if (total_time_elapsed.count() > 3000) {
+            first_cycle.change_direction(Direction::Right);
+        }
+        if (total_time_elapsed.count() > 5000) {
+            first_cycle.change_direction(Direction::Backward);
+        }
+        if (total_time_elapsed.count() > 6000) {
+            first_cycle.change_direction(Direction::Right);
+        }
+
+        // start rendering the light cycles here         
+        first_cycle.move(elapsed.count());
+        first_cycle.draw(light_cycle_shader);
 
         glfwSwapBuffers(window);
         glfwPollEvents();
 
-        rot_angle += 0.1f;
+        t1 = t2;
     }
 
     glfwDestroyWindow(window);

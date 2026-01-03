@@ -17,6 +17,9 @@ find_package(glm CONFIG REQUIRED)
 add_executable(tron_wallpaper
     src/main.cpp
     src/shader.cpp
+    src/tetrahedron.cpp
+    src/light_cycle.cpp
+    src/wallpaper_utils.cpp
 )
 
 target_include_directories(tron_wallpaper
@@ -26,9 +29,10 @@ target_include_directories(tron_wallpaper
 
 target_link_libraries(tron_wallpaper
     PRIVATE
-        glfw
         glad::glad
+        glfw
         glm::glm
+        opengl32
 )
 
 # MSVC niceties
