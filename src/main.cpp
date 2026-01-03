@@ -24,6 +24,7 @@
 
 #include "shader.hpp"
 #include "tetrahedron.hpp"
+#include "light_cycle.hpp"
 
 GLFWwindow *init_glfw_window(uint32_t width, uint32_t height)
 {
@@ -216,23 +217,25 @@ glm::vec3 randomUnitAxis()
 int main()
 {
     // prepare Windows
-    init_os();
+    // init_os();
     
     // get (main) monitor dimensions
-    uint32_t width  = GetSystemMetrics(SM_CXSCREEN);
-    uint32_t height = GetSystemMetrics(SM_CYSCREEN);
+    uint32_t width = 1280;
+    uint32_t height = 720;
+    // uint32_t width  = GetSystemMetrics(SM_CXSCREEN);
+    // uint32_t height = GetSystemMetrics(SM_CYSCREEN);
 
     GLFWwindow *window = init_glfw_window(width, height);
     
     // get the windows handle
-    HWND hwnd = glfwGetWin32Window(window);
-    if (!hwnd) {
-        std::cerr << "Could not get Windows handle from GLFW" << std::endl;
-        std::exit(-1);
-    }
+    // HWND hwnd = glfwGetWin32Window(window);
+    // if (!hwnd) {
+    //     std::cerr << "Could not get Windows handle from GLFW" << std::endl;
+    //     std::exit(-1);
+    // }
 
     // set as background
-    attach_wallpaper_to_os(hwnd, width, height);
+    // attach_wallpaper_to_os(hwnd, width, height);
 
     std::cout << "GLFW window successfully attached under Progman\n";
 
@@ -246,7 +249,7 @@ int main()
     );
     normal_shader.use();
 
-    uint32_t num_of_objs = 400;
+    uint32_t num_of_objs = 20;
 
     std::vector<Tetrahedron> tetrahedrons;
     tetrahedrons.reserve(num_of_objs);
@@ -301,6 +304,19 @@ int main()
 
     std::chrono::steady_clock::time_point t1;
     std::chrono::steady_clock::time_point t2;
+
+    // light cycle shader
+    Shader light_cycle_shader(
+        "light_cycle_vertex_shader.vert",
+        "light_cycle_geometry_shader.geom",
+        "light_cycle_fragment_shader.frag"
+    );
+
+    // create a light cycle here
+    LightCycle first_cycle(glm::vec3(-3.0f, -0.5f, -5.0f));
+
+    std::chrono::steady_clock::time_point t0 = std::chrono::steady_clock::now();
+    t1 = t0;
     
     // Render loop
     while (!glfwWindowShouldClose(window))
@@ -363,6 +379,85 @@ int main()
             tetrahedrons[i].rotate(spinSpeeds[i] * elapsed.count(), spinAxes[i]);
             tetrahedrons[i].draw(normal_shader, i);
         }
+
+        light_cycle_shader.use();
+
+        // view 
+        view = glm::mat4(1.0f);
+        view = glm::translate(view, glm::vec3(0.0f, 0.0f, -3.0f));
+        view_loc = glGetUniformLocation(
+            light_cycle_shader.ID,
+            "view"
+        );
+        if (view_loc == -1) {
+            std::cerr << "View uniform not found" << std::endl;
+        }
+        glUniformMatrix4fv(
+            view_loc,
+            1,
+            GL_FALSE,
+            glm::value_ptr(view)
+        );
+
+        // projection
+        projection = glm::perspective(
+            glm::radians(45.0f), 
+            (float)width / (float)height, // not sure what this is tbh
+            0.1f,  // near clipping distance
+            100.0f // far clipping distance
+        );
+        projection_loc = glGetUniformLocation(
+            light_cycle_shader.ID,
+            "projection"
+        );
+        if (projection_loc == -1) {
+            std::cerr << "Projection uniform not found" << std::endl;
+        }
+        glUniformMatrix4fv(
+            projection_loc,
+            1, 
+            GL_FALSE,
+            glm::value_ptr(projection)
+        );
+
+        // model
+        // glm::mat4 model = glm::mat4(1.0f);
+        // int32_t model_loc = glGetUniformLocation(
+        //     light_cycle_shader.ID,
+        //     "model"
+        // );
+        // if (projection_loc == -1) {
+        //     std::cerr << "Model uniform not found" << std::endl;
+        // }
+        // glUniformMatrix4fv(
+        //     model_loc,
+        //     1, 
+        //     GL_FALSE,
+        //     glm::value_ptr(model)
+        // );
+
+        // move direction after set times
+        auto total_time_elapsed = 
+            std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t0);
+        if (total_time_elapsed.count() > 1000) {
+            first_cycle.change_direction(Direction::Down);
+        }
+        if (total_time_elapsed.count() > 2000) {
+            first_cycle.change_direction(Direction::Forward);
+        }
+        if (total_time_elapsed.count() > 3000) {
+            first_cycle.change_direction(Direction::Right);
+        }
+        if (total_time_elapsed.count() > 5000) {
+            first_cycle.change_direction(Direction::Backward);
+        }
+        if (total_time_elapsed.count() > 6000) {
+            first_cycle.change_direction(Direction::Right);
+        }
+
+        // start rendering the light cycles here         
+        first_cycle.move(elapsed.count());
+        first_cycle.draw(light_cycle_shader);
 
         glfwSwapBuffers(window);
         glfwPollEvents();
