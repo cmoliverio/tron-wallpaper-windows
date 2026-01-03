@@ -35,12 +35,21 @@ public:
 
     void move(uint64_t elapsed_ms);
     void draw(Shader& shader) const;
+    void print_points();
 
-    float thickness = 0.01f;
+    float thickness = 0.05f;
 
 private:
     void push_point_if_needed();
 
+    /**
+     * std::vector<glm::vec3> points is structured as a series of lines.
+     * e.g. 
+     *  p0, p1, p1, p2, p2, p3, p3 .... pn, pHEAD;
+     *    L1      l2      L3              Ln
+     * 
+     * Vertices are repeated to signify line ending and line beginning.
+     */
     std::vector<glm::vec3> points;
     glm::vec3 direction;
 

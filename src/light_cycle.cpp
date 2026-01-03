@@ -4,12 +4,27 @@
 #include <cmath>
 #include <glm/gtc/type_ptr.hpp>
 
+void LightCycle::print_points()
+{
+    std::cout << "points (size = " << points.size() << ")" << std::endl;
+
+    for (const auto& x : points) {
+        std::cout << x.x << ' '
+            << x.y << ' '
+            << x.z << ' '
+            << std::endl;;
+    }
+}
+
 LightCycle::LightCycle(const glm::vec3& startPos, float s)
     : direction(direction_vector(Direction::Right)),
       speed(s),
       distance_since_last(0.0f)
 {
+    // start point
     points.push_back(startPos);
+
+    // push again for head
     points.push_back(startPos);
 
     glGenVertexArrays(1, &vao);
@@ -34,7 +49,13 @@ LightCycle::LightCycle(const glm::vec3& startPos, float s)
 void LightCycle::change_direction(Direction d) 
 {
     // save the back point (head) and change direction
-    points.push_back(points.back());
+    glm::vec3 strip_endpoint = points.back();
+
+    // push once to end current line
+    points.push_back(strip_endpoint);
+
+    // push again to start next line
+    points.push_back(strip_endpoint);
 
     direction = direction_vector(d);
 }
@@ -69,6 +90,6 @@ void LightCycle::draw(Shader& shader) const
     shader.setFloat("uThickness", thickness);
 
     glBindVertexArray(vao);
-    glDrawArrays(GL_LINE_STRIP, 0, static_cast<GLsizei>(points.size()));
+    glDrawArrays(GL_LINES, 0, static_cast<GLsizei>(points.size()));
     glBindVertexArray(0);
 }
