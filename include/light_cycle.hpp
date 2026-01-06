@@ -54,7 +54,7 @@ private:
     std::vector<glm::vec3> points;
     glm::vec3 direction;
 
-    std::vector<Capsule> capsules;
+    std::vector<std::unique_ptr<Capsule>> capsules;
 
     float speed;               // units per second
     float distance_since_last; // for segment spacing

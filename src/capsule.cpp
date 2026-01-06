@@ -1,96 +1,81 @@
 #include "capsule.hpp"
 #include <iostream>
 #include <vector>
+#include <cmath>
 
 struct Vertex {
     glm::vec3 position;
     glm::vec3 normal;
 };
 
-Capsule::Capsule(float r, float initialLength)
-    : radius(r), length(initialLength), p1(0.0f), p2(0.0f, 0.0f, initialLength)
+Capsule::Capsule(const glm::vec3& start, const glm::vec3& end, float r)
+    : p1(start), p2(end), radius(r)
 {
-    buildUnitCapsule();
-    updateModelMatrix();
+    buildCapsuleGeometry(p1, p2);
 }
 
-void Capsule::buildUnitCapsule()
+void Capsule::setEndpoints(const glm::vec3& start, const glm::vec3& end)
+{
+    p1 = start;
+    p2 = end;
+    buildCapsuleGeometry(p1, p2);
+}
+
+void Capsule::buildCapsuleGeometry(const glm::vec3& start, const glm::vec3& end)
 {
     std::vector<Vertex> vertices;
     std::vector<uint32_t> indices;
 
-    const float radius = 0.5f;
-    const float halfLen = 0.5f;
-
-    // Cylinder
-    for (int i = 0; i <= SLICES; ++i) {
-        float theta = (float)i / SLICES * glm::two_pi<float>();
-        float x = cos(theta);
-        float y = sin(theta);
-
-        glm::vec3 normal = { x, y, 0 };
-
-        vertices.push_back({ { radius * x, radius * y, -halfLen }, normal });
-        vertices.push_back({ { radius * x, radius * y,  halfLen }, normal });
+    // Calculate segment direction and length
+    glm::vec3 dir = end - start;
+    float segmentLength = glm::length(dir);
+    
+    glm::vec3 axis;
+    if (segmentLength < 1e-6f) {
+        axis = glm::vec3(0, 0, 1);
+        segmentLength = 0.0f;
+    } else {
+        axis = glm::normalize(dir);
     }
 
-    uint32_t base = 0;
-    for (int i = 0; i < SLICES; ++i) {
-        uint32_t i0 = base + i * 2;
-        uint32_t i1 = i0 + 1;
-        uint32_t i2 = i0 + 2;
-        uint32_t i3 = i0 + 3;
-
-        indices.insert(indices.end(), {
-            i0, i2, i1,
-            i1, i2, i3
-        });
+    // Create rotation matrix to align Z-axis with segment direction
+    glm::vec3 zAxis(0, 0, 1);
+    glm::mat4 rotation = glm::mat4(1.0f);
+    
+    float cosTheta = glm::dot(zAxis, axis);
+    glm::vec3 rotAxis = glm::cross(zAxis, axis);
+    
+    if (glm::length(rotAxis) > 1e-6f) {
+        rotation = glm::rotate(
+            glm::mat4(1.0f),
+            acos(glm::clamp(cosTheta, -1.0f, 1.0f)),
+            glm::normalize(rotAxis)
+        );
+    } else if (cosTheta < -0.9f) {
+        rotation = glm::rotate(glm::mat4(1.0f), glm::pi<float>(), glm::vec3(1, 0, 0));
     }
 
-    // Top hemisphere (+Z)
-    uint32_t topBase = (uint32_t)vertices.size();
+    // Lambda to transform local coordinates to world coordinates
+    auto transformPoint = [&](const glm::vec3& localPos) -> glm::vec3 {
+        glm::vec4 rotated = rotation * glm::vec4(localPos, 1.0f);
+        return start + glm::vec3(rotated);
+    };
 
-    for (int stack = 0; stack <= STACKS; ++stack) {
-        float v = (float)stack / STACKS;
-        float phi = v * glm::half_pi<float>();
+    auto transformNormal = [&](const glm::vec3& localNormal) -> glm::vec3 {
+        glm::vec4 rotated = rotation * glm::vec4(localNormal, 0.0f);
+        return glm::normalize(glm::vec3(rotated));
+    };
 
-        float z = sin(phi);
-        float r = cos(phi);
-
-        for (int slice = 0; slice <= SLICES; ++slice) {
-            float u = (float)slice / SLICES;
-            float theta = u * glm::two_pi<float>();
-
-            float x = r * cos(theta);
-            float y = r * sin(theta);
-
-            glm::vec3 normal = glm::normalize(glm::vec3(x, y, z));
-            glm::vec3 pos = normal * radius + glm::vec3(0, 0, halfLen);
-
-            vertices.push_back({ pos, normal });
-        }
-    }
-
-    for (int stack = 0; stack < STACKS; ++stack) {
-        for (int slice = 0; slice < SLICES; ++slice) {
-            uint32_t i0 = topBase + stack * (SLICES + 1) + slice;
-            uint32_t i1 = i0 + SLICES + 1;
-
-            indices.insert(indices.end(), {
-                i0, i1, i0 + 1,
-                i0 + 1, i1, i1 + 1
-            });
-        }
-    }
-
-    // Bottom hemisphere (-Z)
+    // --------------------------------------------------
+    // Bottom hemisphere at start point (pointing backward)
+    // --------------------------------------------------
     uint32_t botBase = (uint32_t)vertices.size();
 
     for (int stack = 0; stack <= STACKS; ++stack) {
         float v = (float)stack / STACKS;
         float phi = v * glm::half_pi<float>();
 
-        float z = -sin(phi);
+        float z = -sin(phi);  // Goes from 0 to -radius
         float r = cos(phi);
 
         for (int slice = 0; slice <= SLICES; ++slice) {
@@ -100,10 +85,13 @@ void Capsule::buildUnitCapsule()
             float x = r * cos(theta);
             float y = r * sin(theta);
 
-            glm::vec3 normal = glm::normalize(glm::vec3(x, y, z));
-            glm::vec3 pos = normal * radius - glm::vec3(0, 0, halfLen);
+            glm::vec3 localNormal = glm::normalize(glm::vec3(x, y, z));
+            glm::vec3 localPos = localNormal * radius;
+            
+            glm::vec3 worldPos = transformPoint(localPos);
+            glm::vec3 worldNormal = transformNormal(localNormal);
 
-            vertices.push_back({ pos, normal });
+            vertices.push_back({ worldPos, worldNormal });
         }
     }
 
@@ -119,7 +107,91 @@ void Capsule::buildUnitCapsule()
         }
     }
 
+    // --------------------------------------------------
+    // Cylinder from start to end
+    // --------------------------------------------------
+    uint32_t cylBase = (uint32_t)vertices.size();
+    
+    for (int i = 0; i <= SLICES; ++i) {
+        float theta = (float)i / SLICES * glm::two_pi<float>();
+        float x = cos(theta);
+        float y = sin(theta);
+
+        glm::vec3 localNormal = glm::vec3(x, y, 0);
+        glm::vec3 worldNormal = transformNormal(localNormal);
+
+        // Bottom ring at z=0
+        glm::vec3 localPosBot = glm::vec3(radius * x, radius * y, 0.0f);
+        glm::vec3 worldPosBot = transformPoint(localPosBot);
+        vertices.push_back({ worldPosBot, worldNormal });
+
+        // Top ring at z=segmentLength
+        glm::vec3 localPosTop = glm::vec3(radius * x, radius * y, segmentLength);
+        glm::vec3 worldPosTop = transformPoint(localPosTop);
+        vertices.push_back({ worldPosTop, worldNormal });
+    }
+
+    for (int i = 0; i < SLICES; ++i) {
+        uint32_t i0 = cylBase + i * 2;
+        uint32_t i1 = i0 + 1;
+        uint32_t i2 = i0 + 2;
+        uint32_t i3 = i0 + 3;
+
+        indices.insert(indices.end(), {
+            i0, i2, i1,
+            i1, i2, i3
+        });
+    }
+
+    // --------------------------------------------------
+    // Top hemisphere at end point (pointing forward)
+    // --------------------------------------------------
+    uint32_t topBase = (uint32_t)vertices.size();
+
+    for (int stack = 0; stack <= STACKS; ++stack) {
+        float v = (float)stack / STACKS;
+        float phi = v * glm::half_pi<float>();
+
+        float z = sin(phi);  // Goes from 0 to +radius
+        float r = cos(phi);
+
+        for (int slice = 0; slice <= SLICES; ++slice) {
+            float u = (float)slice / SLICES;
+            float theta = u * glm::two_pi<float>();
+
+            float x = r * cos(theta);
+            float y = r * sin(theta);
+
+            glm::vec3 localNormal = glm::normalize(glm::vec3(x, y, z));
+            glm::vec3 localPos = glm::vec3(x * radius, y * radius, segmentLength + z * radius);
+            
+            glm::vec3 worldPos = transformPoint(localPos);
+            glm::vec3 worldNormal = transformNormal(localNormal);
+
+            vertices.push_back({ worldPos, worldNormal });
+        }
+    }
+
+    for (int stack = 0; stack < STACKS; ++stack) {
+        for (int slice = 0; slice < SLICES; ++slice) {
+            uint32_t i0 = topBase + stack * (SLICES + 1) + slice;
+            uint32_t i1 = i0 + SLICES + 1;
+
+            indices.insert(indices.end(), {
+                i0, i1, i0 + 1,
+                i0 + 1, i1, i1 + 1
+            });
+        }
+    }
+
     indexCount = (uint32_t)indices.size();
+
+    // Delete old buffers if they exist
+    if (vao) {
+        glDeleteVertexArrays(1, &vao);
+        glDeleteBuffers(1, &vbo);
+        glDeleteBuffers(1, &ebo);
+    }
 
     // Upload to GPU
     glGenVertexArrays(1, &vao);
@@ -132,13 +204,13 @@ void Capsule::buildUnitCapsule()
     glBufferData(GL_ARRAY_BUFFER,
         vertices.size() * sizeof(Vertex),
         vertices.data(),
-        GL_STATIC_DRAW);
+        GL_DYNAMIC_DRAW);  // Use DYNAMIC_DRAW since we rebuild often
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER,
         indices.size() * sizeof(uint32_t),
         indices.data(),
-        GL_STATIC_DRAW);
+        GL_DYNAMIC_DRAW);
 
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE,
@@ -151,62 +223,14 @@ void Capsule::buildUnitCapsule()
     glBindVertexArray(0);
 }
 
-void Capsule::updateModelMatrix()
-{
-    glm::vec3 dir = p2 - p1;
-    length = glm::length(dir);
-
-    if (length < 1e-6f) {
-        model = glm::translate(glm::mat4(1.0f), p1);
-        return;
-    }
-
-    glm::vec3 axis = glm::normalize(dir);
-    glm::vec3 zAxis = {0, 0, 1};
-
-    // rotation
-    float cosTheta = glm::dot(zAxis, axis);
-    glm::vec3 rotAxis = glm::cross(zAxis, axis);
-
-    glm::mat4 rotation = glm::mat4(1.0f);
-    if (glm::length(rotAxis) > 1e-6f) {
-        rotation = glm::rotate(
-            glm::mat4(1.0f),
-            acos(cosTheta),
-            glm::normalize(rotAxis)
-        );
-    } else if (cosTheta < -0.9f) {
-        // Handle 180-degree case (pointing backwards)
-        rotation = glm::rotate(glm::mat4(1.0f), glm::pi<float>(), glm::vec3(1, 0, 0));
-    }
-
-    // scale: radius in X/Y, length in Z
-    glm::mat4 scale = glm::scale(
-        glm::mat4(1.0f),
-        { radius * 2.0f, radius * 2.0f, length }
-    );
-
-    // translate to midpoint
-    glm::vec3 center = (p1 + p2) * 0.5f;
-    glm::mat4 translation = glm::translate(glm::mat4(1.0f), center);
-
-    model = translation * rotation * scale;
-}
-
-void Capsule::setEndpoints(const glm::vec3& a, const glm::vec3& b)
-{
-    p1 = a;
-    p2 = b;
-    updateModelMatrix();
-}
-
 void Capsule::draw(Shader& shader) const
 {
+// Since our geometry is already in world space, use identity matrix
+    glm::mat4 model = glm::mat4(1.0f);
     int32_t model_loc = glGetUniformLocation(shader.ID, "model");
     if (model_loc != -1) {
         glUniformMatrix4fv(model_loc, 1, GL_FALSE, glm::value_ptr(model));
     }
-
     glBindVertexArray(vao);
     glDrawElements(GL_TRIANGLES, indexCount, GL_UNSIGNED_INT, nullptr);
     glBindVertexArray(0);

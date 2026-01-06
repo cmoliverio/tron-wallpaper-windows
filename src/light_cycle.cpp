@@ -6,14 +6,14 @@
 
 void LightCycle::print_points()
 {
-    std::cout << "points (size = " << points.size() << ")" << std::endl;
+    // std::cout << "points (size = " << points.size() << ")" << std::endl;
 
-    for (const auto& x : points) {
-        std::cout << x.x << ' '
-            << x.y << ' '
-            << x.z << ' '
-            << std::endl;;
-    }
+    // for (const auto& x : points) {
+    //     std::cout << x.x << ' '
+    //         << x.y << ' '
+    //         << x.z << ' '
+    //         << std::endl;;
+    // }
 }
 
 LightCycle::LightCycle(const glm::vec3& startPos, float s)
@@ -21,29 +21,47 @@ LightCycle::LightCycle(const glm::vec3& startPos, float s)
       speed(s),
       distance_since_last(0.0f)
 {
-    // start point
     points.push_back(startPos);
-    // push again for head
-    points.push_back(startPos);
+    points.push_back(startPos + (direction * speed));
     
-    // CREATE THE FIRST CAPSULE HERE
-    capsules.emplace_back(thickness * 0.5f);
-    capsules.back().setEndpoints(startPos, startPos);
-    
-    glGenVertexArrays(1, &vao);
-    glGenBuffers(1, &vbo);
-    glBindVertexArray(vao);
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    glBufferData(
-        GL_ARRAY_BUFFER,
-        points.size() * sizeof(glm::vec3),
-        points.data(),
-        GL_DYNAMIC_DRAW
+    // Create first capsule
+    capsules.push_back(
+        std::make_unique<Capsule>(
+            startPos,
+            startPos + (direction * speed),
+            thickness * 0.5f
+        )
     );
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(glm::vec3), (void*)0);
-    glBindVertexArray(0);
 }
+
+// LightCycle::LightCycle(const glm::vec3& startPos, float s)
+//     : direction(direction_vector(Direction::Right)),
+//       speed(s),
+//       distance_since_last(0.0f)
+// {
+//     // start point
+//     points.push_back(startPos);
+//     // push again for head
+//     points.push_back(startPos);
+    
+//     // CREATE THE FIRST CAPSULE HERE
+//     capsules.emplace_back(thickness * 0.5f);
+//     capsules.back().setEndpoints(startPos, startPos);
+    
+//     glGenVertexArrays(1, &vao);
+//     glGenBuffers(1, &vbo);
+//     glBindVertexArray(vao);
+//     glBindBuffer(GL_ARRAY_BUFFER, vbo);
+//     glBufferData(
+//         GL_ARRAY_BUFFER,
+//         points.size() * sizeof(glm::vec3),
+//         points.data(),
+//         GL_DYNAMIC_DRAW
+//     );
+//     glEnableVertexAttribArray(0);
+//     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(glm::vec3), (void*)0);
+//     glBindVertexArray(0);
+// }
 
 // LightCycle::LightCycle(const glm::vec3& startPos, float s)
 //     : direction(direction_vector(Direction::Right)),
@@ -78,13 +96,28 @@ LightCycle::LightCycle(const glm::vec3& startPos, float s)
 void LightCycle::change_direction(Direction d)
 {
     glm::vec3 endpoint = points.back();
-
     points.push_back(endpoint);
-    points.push_back(endpoint);
-
-    capsules.emplace_back(thickness * 0.5f);
-    capsules.back().setEndpoints(endpoint, endpoint);
-
+    points.push_back(endpoint + (direction * speed));
+    
+    // Create new capsule for the new segment
+    // for(int i = 0; i < capsules.size(); i++)
+    // {
+    //     Capsule *cap = &capsules[i];
+    //     // std::cout << cap->radius << " x" << cap.p1.x << " y" << cap.p1.y 
+    //     //     << "  z" << cap.p1.x << std::endl;
+    //     // std::cout << cap.radius << " x" << cap.p2.x << " y" << cap.p2.y 
+    //     //     << "  z" << cap.p2.x << std::endl;
+    //     // std::cout << std::endl;
+    // }
+    // std::cout << "-------" << std::endl;
+    capsules.push_back(
+        std::make_unique<Capsule>(
+            endpoint,
+            endpoint + (direction * speed),
+            thickness * 0.5f
+        )
+    );
+    
     direction = direction_vector(d);
 }
 
@@ -99,60 +132,27 @@ void LightCycle::move(uint64_t elapsed_ms)
 {
     glm::vec3& head = points.back();
     glm::vec3 tail = points[points.size() - 2];
-
     float distance = elapsed_ms * speed;
     head += direction * distance;
-
-    capsules.back().setEndpoints(tail, head);
-}
-
-// void LightCycle::move(uint64_t elapsed_ms)
-// {
-//     glm::vec3& head = points.back();
-
-//     float distance = elapsed_ms * speed;
-
-//     head += direction * distance;
     
-//     head_capsule = capsules.back();
-
-//     head_capsule.recalculate_the_capsule_faces(
-//         points[points.size() - 2], 
-//         points.back()
-//         thickness
-//     );
-
-//     glBindBuffer(GL_ARRAY_BUFFER, vbo);
-//     glBufferData(
-//         GL_ARRAY_BUFFER,
-//         points.size() * sizeof(glm::vec3),
-//         points.data(),
-//         GL_DYNAMIC_DRAW
-//     );
-// }
+    // Rebuild the last capsule with new endpoints
+    capsules.back()->setEndpoints(tail, head);
+}
 
 void LightCycle::draw(Shader& shader) const
 {
     shader.use();
-
-    for (const Capsule& c : capsules) {
-        c.draw(shader);
+    
+    // Set identity model matrix since capsules are already in world space
+    // glm::mat4 identity = glm::mat4(1.0f);
+    // int32_t model_loc = glGetUniformLocation(shader.ID, "model");
+    // if (model_loc != -1) {
+    //     glUniformMatrix4fv(model_loc, 1, GL_FALSE, glm::value_ptr(identity));
+    // }
+    
+    // std::cout << "capsules leng" << capsules.size() << std::endl;
+    
+    for (const auto& c : capsules) {
+        c->draw(shader);
     }
 }
-
-// void LightCycle::draw(Shader& shader) const
-// {
-//     shader.use();
-//     shader.setFloat("uThickness", thickness);
-
-//     // this will need to be changed to draw triangles, 
-//     // glBindVertexArray(vao);
-//     // glDrawArrays(GL_LINES, 0, static_cast<GLsizei>(points.size()));
-//     // glBindVertexArray(0);
-
-//     // all of the capsules in the list have already calculated their vertices and faces 
-//     // EXCEPT for the last one, which is always being updated until the next move
-//     // SO we should probably be calling the draw call fo reach capsule
-//     for capsule in capsules:
-//         capsule.draw();
-// }

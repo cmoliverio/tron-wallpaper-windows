@@ -438,10 +438,10 @@ int main()
             glUniform3f(color_loc, 0.0f, 0.8f, 1.0f); // Cyan/blue color for the light cycle
         }
 
-        int32_t ambient_loc = glGetUniformLocation(light_cycle_shader.ID, "uAmbient");
-        if (ambient_loc != -1) {
-            glUniform1f(ambient_loc, 0.3f);
-        }
+        // int32_t ambient_loc = glGetUniformLocation(light_cycle_shader.ID, "uAmbient");
+        // if (ambient_loc != -1) {
+        //     glUniform1f(ambient_loc, 0.3f);
+        // }
 
         // view matrix
         view_loc = glGetUniformLocation(light_cycle_shader.ID, "view");
