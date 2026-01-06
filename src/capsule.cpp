@@ -67,15 +67,15 @@ void Capsule::buildCapsuleGeometry(const glm::vec3& start, const glm::vec3& end)
     };
 
     // --------------------------------------------------
-    // Bottom hemisphere at start point (pointing backward)
+    // Bottom sphere at start point
     // --------------------------------------------------
     uint32_t botBase = (uint32_t)vertices.size();
 
-    for (int stack = 0; stack <= STACKS; ++stack) {
-        float v = (float)stack / STACKS;
-        float phi = v * glm::half_pi<float>();
+    for (int stack = 0; stack <= STACKS * 2; ++stack) {
+        float v = (float)stack / (STACKS * 2);
+        float phi = v * glm::pi<float>() - glm::half_pi<float>();  // -PI/2 to +PI/2
 
-        float z = -sin(phi);  // Goes from 0 to -radius
+        float y = sin(phi);
         float r = cos(phi);
 
         for (int slice = 0; slice <= SLICES; ++slice) {
@@ -83,26 +83,26 @@ void Capsule::buildCapsuleGeometry(const glm::vec3& start, const glm::vec3& end)
             float theta = u * glm::two_pi<float>();
 
             float x = r * cos(theta);
-            float y = r * sin(theta);
+            float z = r * sin(theta);
 
             glm::vec3 localNormal = glm::normalize(glm::vec3(x, y, z));
             glm::vec3 localPos = localNormal * radius;
             
-            glm::vec3 worldPos = transformPoint(localPos);
-            glm::vec3 worldNormal = transformNormal(localNormal);
+            glm::vec3 worldPos = start + localPos;  // Sphere centered at start
+            glm::vec3 worldNormal = glm::normalize(localNormal);
 
             vertices.push_back({ worldPos, worldNormal });
         }
     }
 
-    for (int stack = 0; stack < STACKS; ++stack) {
+    for (int stack = 0; stack < STACKS * 2; ++stack) {
         for (int slice = 0; slice < SLICES; ++slice) {
             uint32_t i0 = botBase + stack * (SLICES + 1) + slice;
             uint32_t i1 = i0 + SLICES + 1;
 
             indices.insert(indices.end(), {
-                i0 + 1, i1, i0,
-                i1 + 1, i1, i0 + 1
+                i0, i1, i0 + 1,
+                i0 + 1, i1, i1 + 1
             });
         }
     }
@@ -120,12 +120,12 @@ void Capsule::buildCapsuleGeometry(const glm::vec3& start, const glm::vec3& end)
         glm::vec3 localNormal = glm::vec3(x, y, 0);
         glm::vec3 worldNormal = transformNormal(localNormal);
 
-        // Bottom ring at z=0
+        // Bottom ring at z=0 (at start point)
         glm::vec3 localPosBot = glm::vec3(radius * x, radius * y, 0.0f);
         glm::vec3 worldPosBot = transformPoint(localPosBot);
         vertices.push_back({ worldPosBot, worldNormal });
 
-        // Top ring at z=segmentLength
+        // Top ring at z=segmentLength (at end point)
         glm::vec3 localPosTop = glm::vec3(radius * x, radius * y, segmentLength);
         glm::vec3 worldPosTop = transformPoint(localPosTop);
         vertices.push_back({ worldPosTop, worldNormal });
@@ -144,15 +144,15 @@ void Capsule::buildCapsuleGeometry(const glm::vec3& start, const glm::vec3& end)
     }
 
     // --------------------------------------------------
-    // Top hemisphere at end point (pointing forward)
+    // Top sphere at end point
     // --------------------------------------------------
     uint32_t topBase = (uint32_t)vertices.size();
 
-    for (int stack = 0; stack <= STACKS; ++stack) {
-        float v = (float)stack / STACKS;
-        float phi = v * glm::half_pi<float>();
+    for (int stack = 0; stack <= STACKS * 2; ++stack) {
+        float v = (float)stack / (STACKS * 2);
+        float phi = v * glm::pi<float>() - glm::half_pi<float>();  // -PI/2 to +PI/2
 
-        float z = sin(phi);  // Goes from 0 to +radius
+        float y = sin(phi);
         float r = cos(phi);
 
         for (int slice = 0; slice <= SLICES; ++slice) {
@@ -160,19 +160,19 @@ void Capsule::buildCapsuleGeometry(const glm::vec3& start, const glm::vec3& end)
             float theta = u * glm::two_pi<float>();
 
             float x = r * cos(theta);
-            float y = r * sin(theta);
+            float z = r * sin(theta);
 
             glm::vec3 localNormal = glm::normalize(glm::vec3(x, y, z));
-            glm::vec3 localPos = glm::vec3(x * radius, y * radius, segmentLength + z * radius);
+            glm::vec3 localPos = localNormal * radius;
             
-            glm::vec3 worldPos = transformPoint(localPos);
-            glm::vec3 worldNormal = transformNormal(localNormal);
+            glm::vec3 worldPos = end + localPos;  // Sphere centered at end
+            glm::vec3 worldNormal = glm::normalize(localNormal);
 
             vertices.push_back({ worldPos, worldNormal });
         }
     }
 
-    for (int stack = 0; stack < STACKS; ++stack) {
+    for (int stack = 0; stack < STACKS * 2; ++stack) {
         for (int slice = 0; slice < SLICES; ++slice) {
             uint32_t i0 = topBase + stack * (SLICES + 1) + slice;
             uint32_t i1 = i0 + SLICES + 1;
@@ -204,7 +204,7 @@ void Capsule::buildCapsuleGeometry(const glm::vec3& start, const glm::vec3& end)
     glBufferData(GL_ARRAY_BUFFER,
         vertices.size() * sizeof(Vertex),
         vertices.data(),
-        GL_DYNAMIC_DRAW);  // Use DYNAMIC_DRAW since we rebuild often
+        GL_DYNAMIC_DRAW);
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER,

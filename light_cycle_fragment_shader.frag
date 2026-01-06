@@ -46,33 +46,14 @@
 // }
 
 #version 330 core
-
 in vec3 vNormal;
 in vec3 vViewPos;
 
 uniform vec3 uColor;
-uniform vec3 uLightPos;   // in view space
-uniform float uAmbient = 0.2;
 
 out vec4 FragColor;
 
 void main()
 {
-    vec3 N = normalize(vNormal);
-    vec3 L = normalize(uLightPos - vViewPos);
-    vec3 V = normalize(-vViewPos);
-
-    // Diffuse
-    float diff = max(dot(N, L), 0.0);
-
-    // Specular (Blinn)
-    vec3 H = normalize(L + V);
-    float spec = pow(max(dot(N, H), 0.0), 32.0);
-
-    vec3 color =
-        uAmbient * uColor +
-        diff * uColor +
-        spec * vec3(1.0);
-
-    FragColor = vec4(color, 1.0);
+    FragColor = vec4(0.5, 0.8, 1.0, 1.0);
 }

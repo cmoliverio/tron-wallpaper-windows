@@ -304,7 +304,7 @@ int main()
 
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
-    glCullFace(GL_BACK);
+    // glCullFace(GL_BACK);
 
     // glDisable(GL_CULL_FACE);
     // glDisable(GL_DEPTH_TEST); // temporarily
@@ -426,17 +426,17 @@ int main()
         //     glm::value_ptr(projection));
         light_cycle_shader.use();
 
-        // Set uniforms for lighting
-        glm::vec3 lightPosView = glm::vec3(view * glm::vec4(5.0f, 5.0f, 5.0f, 1.0f));
-        int32_t light_pos_loc = glGetUniformLocation(light_cycle_shader.ID, "uLightPos");
-        if (light_pos_loc != -1) {
-            glUniform3fv(light_pos_loc, 1, glm::value_ptr(lightPosView));
-        }
+        // // Set uniforms for lighting
+        // glm::vec3 lightPosView = glm::vec3(view * glm::vec4(5.0f, 5.0f, 5.0f, 1.0f));
+        // int32_t light_pos_loc = glGetUniformLocation(light_cycle_shader.ID, "uLightPos");
+        // if (light_pos_loc != -1) {
+        //     glUniform3fv(light_pos_loc, 1, glm::value_ptr(lightPosView));
+        // }
 
-        int32_t color_loc = glGetUniformLocation(light_cycle_shader.ID, "uColor");
-        if (color_loc != -1) {
-            glUniform3f(color_loc, 0.0f, 0.8f, 1.0f); // Cyan/blue color for the light cycle
-        }
+        // int32_t color_loc = glGetUniformLocation(light_cycle_shader.ID, "uColor");
+        // if (color_loc != -1) {
+        //     glUniform3f(color_loc, 0.0f, 0.8f, 1.0f); // Cyan/blue color for the light cycle
+        // }
 
         // int32_t ambient_loc = glGetUniformLocation(light_cycle_shader.ID, "uAmbient");
         // if (ambient_loc != -1) {
