@@ -19,6 +19,7 @@ add_executable(tron_wallpaper
     src/shader.cpp
     src/tetrahedron.cpp
     src/light_cycle.cpp
+    src/capsule.cpp
     src/wallpaper_utils.cpp
 )
 

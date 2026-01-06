@@ -23,39 +23,67 @@ LightCycle::LightCycle(const glm::vec3& startPos, float s)
 {
     // start point
     points.push_back(startPos);
-
     // push again for head
     points.push_back(startPos);
-
+    
+    // CREATE THE FIRST CAPSULE HERE
+    capsules.emplace_back(thickness * 0.5f);
+    capsules.back().setEndpoints(startPos, startPos);
+    
     glGenVertexArrays(1, &vao);
     glGenBuffers(1, &vbo);
-
     glBindVertexArray(vao);
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
-
     glBufferData(
         GL_ARRAY_BUFFER,
         points.size() * sizeof(glm::vec3),
         points.data(),
         GL_DYNAMIC_DRAW
     );
-
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(glm::vec3), (void*)0);
-
     glBindVertexArray(0);
 }
 
-void LightCycle::change_direction(Direction d) 
+// LightCycle::LightCycle(const glm::vec3& startPos, float s)
+//     : direction(direction_vector(Direction::Right)),
+//       speed(s),
+//       distance_since_last(0.0f)
+// {
+//     // start point
+//     points.push_back(startPos);
+
+//     // push again for head
+//     points.push_back(startPos);
+
+//     glGenVertexArrays(1, &vao);
+//     glGenBuffers(1, &vbo);
+
+//     glBindVertexArray(vao);
+//     glBindBuffer(GL_ARRAY_BUFFER, vbo);
+
+//     glBufferData(
+//         GL_ARRAY_BUFFER,
+//         points.size() * sizeof(glm::vec3),
+//         points.data(),
+//         GL_DYNAMIC_DRAW
+//     );
+
+//     glEnableVertexAttribArray(0);
+//     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(glm::vec3), (void*)0);
+
+//     glBindVertexArray(0);
+// }
+
+void LightCycle::change_direction(Direction d)
 {
-    // save the back point (head) and change direction
-    glm::vec3 strip_endpoint = points.back();
+    glm::vec3 endpoint = points.back();
 
-    // push once to end current line
-    points.push_back(strip_endpoint);
+    points.push_back(endpoint);
+    points.push_back(endpoint);
 
-    // push again to start next line
-    points.push_back(strip_endpoint);
+    capsules.emplace_back(thickness * 0.5f);
+    capsules.back().setEndpoints(endpoint, endpoint);
 
     direction = direction_vector(d);
 }
@@ -70,26 +98,61 @@ void LightCycle::change_direction_random()
 void LightCycle::move(uint64_t elapsed_ms)
 {
     glm::vec3& head = points.back();
+    glm::vec3 tail = points[points.size() - 2];
 
     float distance = elapsed_ms * speed;
-
     head += direction * distance;
 
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    glBufferData(
-        GL_ARRAY_BUFFER,
-        points.size() * sizeof(glm::vec3),
-        points.data(),
-        GL_DYNAMIC_DRAW
-    );
+    capsules.back().setEndpoints(tail, head);
 }
+
+// void LightCycle::move(uint64_t elapsed_ms)
+// {
+//     glm::vec3& head = points.back();
+
+//     float distance = elapsed_ms * speed;
+
+//     head += direction * distance;
+    
+//     head_capsule = capsules.back();
+
+//     head_capsule.recalculate_the_capsule_faces(
+//         points[points.size() - 2], 
+//         points.back()
+//         thickness
+//     );
+
+//     glBindBuffer(GL_ARRAY_BUFFER, vbo);
+//     glBufferData(
+//         GL_ARRAY_BUFFER,
+//         points.size() * sizeof(glm::vec3),
+//         points.data(),
+//         GL_DYNAMIC_DRAW
+//     );
+// }
 
 void LightCycle::draw(Shader& shader) const
 {
     shader.use();
-    shader.setFloat("uThickness", thickness);
 
-    glBindVertexArray(vao);
-    glDrawArrays(GL_LINES, 0, static_cast<GLsizei>(points.size()));
-    glBindVertexArray(0);
+    for (const Capsule& c : capsules) {
+        c.draw(shader);
+    }
 }
+
+// void LightCycle::draw(Shader& shader) const
+// {
+//     shader.use();
+//     shader.setFloat("uThickness", thickness);
+
+//     // this will need to be changed to draw triangles, 
+//     // glBindVertexArray(vao);
+//     // glDrawArrays(GL_LINES, 0, static_cast<GLsizei>(points.size()));
+//     // glBindVertexArray(0);
+
+//     // all of the capsules in the list have already calculated their vertices and faces 
+//     // EXCEPT for the last one, which is always being updated until the next move
+//     // SO we should probably be calling the draw call fo reach capsule
+//     for capsule in capsules:
+//         capsule.draw();
+// }

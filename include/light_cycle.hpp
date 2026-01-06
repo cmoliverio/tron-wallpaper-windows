@@ -5,6 +5,7 @@
 #include <random>
 #include <glm/glm.hpp>
 
+#include "capsule.hpp"
 #include "shader.hpp"
 
 enum class Direction {
@@ -52,6 +53,8 @@ private:
      */
     std::vector<glm::vec3> points;
     glm::vec3 direction;
+
+    std::vector<Capsule> capsules;
 
     float speed;               // units per second
     float distance_since_last; // for segment spacing

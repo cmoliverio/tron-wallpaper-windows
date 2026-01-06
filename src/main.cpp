@@ -24,6 +24,7 @@
 
 #include "shader.hpp"
 #include "tetrahedron.hpp"
+#include "capsule.hpp"
 #include "light_cycle.hpp"
 
 GLFWwindow *init_glfw_window(uint32_t width, uint32_t height)
@@ -67,7 +68,7 @@ GLFWwindow *init_glfw_window(uint32_t width, uint32_t height)
 
 HWND get_progman()
 {
-    HWND progman = FindWindow("Progman", NULL);
+    HWND progman = FindWindow(TEXT("Progman"), NULL);
     if (!progman)
     {
         std::cerr << "Did not find progman.  Giving up." << std::endl;
@@ -118,7 +119,7 @@ void attach_24h2_or_newer(HWND window, uint32_t width, uint32_t height)
     // parent to progman
     SetParent(window, progman);
 
-    HWND shell = FindWindowEx(progman, NULL, "SHELLDLL_DefView", NULL);
+    HWND shell = FindWindowEx(progman, NULL, TEXT("SHELLDLL_DefView"), NULL);
     if (!shell)
     {
         std::cerr << "WARNING: Missing SHELLDLL_DefView\n"
@@ -149,11 +150,11 @@ void attach_24h2_or_newer(HWND window, uint32_t width, uint32_t height)
 
 BOOL CALLBACK EnumWindowsProc(HWND hwnd, LPARAM lParam)
 {
-    HWND shell = FindWindowEx(hwnd, NULL, "SHELLDLL_DefView", NULL);
+    HWND shell = FindWindowEx(hwnd, NULL, TEXT("SHELLDLL_DefView"), NULL);
     if (shell != NULL)
     {
         HWND *workerW = reinterpret_cast<HWND *>(lParam);
-        *workerW = FindWindowEx(NULL, hwnd, "WorkerW", NULL);
+        *workerW = FindWindowEx(NULL, hwnd, TEXT("WorkerW"), NULL);
         return FALSE; // stop
     }
     return TRUE; // continue
@@ -229,7 +230,7 @@ int main()
     init_os();
 
     // get (main) monitor dimensions
-    uint32_t width = 1280;
+    uint32_t width = 1800;
     uint32_t height = 720;
     // uint32_t width  = GetSystemMetrics(SM_CXSCREEN);
     // uint32_t height = GetSystemMetrics(SM_CYSCREEN);
@@ -263,7 +264,7 @@ int main()
     std::uniform_real_distribution<float> distXY(-5.0f, 5.0f);
     std::uniform_real_distribution<float> distZ(-15.f, -2.0f); // in front of camera at z=+3
 
-    for (int i = 0; i < num_of_objs; ++i)
+    for (uint32_t i = 0; i < num_of_objs; ++i)
     {
         glm::vec3 pos{
             distXY(rng),
@@ -277,7 +278,7 @@ int main()
     std::vector<glm::vec3> spinAxes;
     spinAxes.reserve(num_of_objs);
 
-    for (int i = 0; i < num_of_objs; ++i)
+    for (uint32_t i = 0; i < num_of_objs; ++i)
     {
         spinAxes.push_back(randomUnitAxis());
     }
@@ -288,7 +289,7 @@ int main()
     std::normal_distribution<float> spinDegDist(0.1f, 0.1f); // degrees
     // std::mt19937 rng{ std::random_device{}() };
 
-    for (int i = 0; i < num_of_objs; ++i)
+    for (uint32_t i = 0; i < num_of_objs; ++i)
     {
         float spinDeg;
 
@@ -301,12 +302,12 @@ int main()
         spinSpeeds.push_back(glm::radians(spinDeg)); // convert to radians
     }
 
-    // glEnable(GL_DEPTH_TEST);
-    // glEnable(GL_CULL_FACE);
-    // glCullFace(GL_BACK);
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
 
-    glDisable(GL_CULL_FACE);
-    glDisable(GL_DEPTH_TEST); // temporarily
+    // glDisable(GL_CULL_FACE);
+    // glDisable(GL_DEPTH_TEST); // temporarily
 
     std::chrono::steady_clock::time_point t1;
     std::chrono::steady_clock::time_point t2;
@@ -314,17 +315,18 @@ int main()
     // light cycle shader
     Shader light_cycle_shader(
         "light_cycle_vertex_shader.vert",
-        "light_cycle_geometry_shader.geom",
+        // "light_cycle_geometry_shader.geom",
         "light_cycle_fragment_shader.frag");
 
     // create a light cycle here
     LightCycle first_cycle(glm::vec3(-3.0f, -0.5f, -5.0f));
 
-    std::chrono::steady_clock::time_point t0 = std::chrono::steady_clock::now();
-    t1 = t0;
 
     glm::mat4 view = glm::mat4(1.0f);
     view = glm::translate(view, glm::vec3(0.0f, 0.0f, -3.0f));
+
+    std::chrono::steady_clock::time_point t0 = std::chrono::steady_clock::now();
+    t1 = t0;
 
     // Render loop
     while (!glfwWindowShouldClose(window))
@@ -378,66 +380,80 @@ int main()
             GL_FALSE,
             glm::value_ptr(projection));
 
-        for (size_t i = 0; i < tetrahedrons.size(); ++i)
+        for (uint32_t i = 0; i < tetrahedrons.size(); ++i)
         {
             // then get the value for that triangle here and make the spin speed
             tetrahedrons[i].rotate(spinSpeeds[i] * elapsed.count(), spinAxes[i]);
             tetrahedrons[i].draw(normal_shader, i);
         }
 
-        light_cycle_shader.use();
+        // light_cycle_shader.use();
 
-        // view
-        // view = glm::mat4(1.0f);
-        // view = glm::translate(view, glm::vec3(0.0f, 0.0f, -3.0f));
-        view_loc = glGetUniformLocation(
-            light_cycle_shader.ID,
-            "view");
-        if (view_loc == -1)
-        {
-            std::cerr << "View uniform not found" << std::endl;
-        }
-        glUniformMatrix4fv(
-            view_loc,
-            1,
-            GL_FALSE,
-            glm::value_ptr(view));
-
-        // projection
-        projection = glm::perspective(
-            glm::radians(45.0f),
-            (float)width / (float)height, // not sure what this is tbh
-            0.1f,                         // near clipping distance
-            100.0f                        // far clipping distance
-        );
-        projection_loc = glGetUniformLocation(
-            light_cycle_shader.ID,
-            "projection");
-        if (projection_loc == -1)
-        {
-            std::cerr << "Projection uniform not found" << std::endl;
-        }
-        glUniformMatrix4fv(
-            projection_loc,
-            1,
-            GL_FALSE,
-            glm::value_ptr(projection));
-
-        // model
-        // glm::mat4 model = glm::mat4(1.0f);
-        // int32_t model_loc = glGetUniformLocation(
+        // // view
+        // // view = glm::mat4(1.0f);
+        // // view = glm::translate(view, glm::vec3(0.0f, 0.0f, -3.0f));
+        // view_loc = glGetUniformLocation(
         //     light_cycle_shader.ID,
-        //     "model"
-        // );
-        // if (projection_loc == -1) {
-        //     std::cerr << "Model uniform not found" << std::endl;
+        //     "view");
+        // if (view_loc == -1)
+        // {
+        //     std::cerr << "View uniform not found" << std::endl;
         // }
         // glUniformMatrix4fv(
-        //     model_loc,
+        //     view_loc,
         //     1,
         //     GL_FALSE,
-        //     glm::value_ptr(model)
+        //     glm::value_ptr(view));
+
+        // // projection
+        // projection = glm::perspective(
+        //     glm::radians(45.0f),
+        //     (float)width / (float)height, // not sure what this is tbh
+        //     0.1f,                         // near clipping distance
+        //     100.0f                        // far clipping distance
         // );
+        // projection_loc = glGetUniformLocation(
+        //     light_cycle_shader.ID,
+        //     "projection");
+        // if (projection_loc == -1)
+        // {
+        //     std::cerr << "Projection uniform not found" << std::endl;
+        // }
+        // glUniformMatrix4fv(
+        //     projection_loc,
+        //     1,
+        //     GL_FALSE,
+        //     glm::value_ptr(projection));
+        light_cycle_shader.use();
+
+        // Set uniforms for lighting
+        glm::vec3 lightPosView = glm::vec3(view * glm::vec4(5.0f, 5.0f, 5.0f, 1.0f));
+        int32_t light_pos_loc = glGetUniformLocation(light_cycle_shader.ID, "uLightPos");
+        if (light_pos_loc != -1) {
+            glUniform3fv(light_pos_loc, 1, glm::value_ptr(lightPosView));
+        }
+
+        int32_t color_loc = glGetUniformLocation(light_cycle_shader.ID, "uColor");
+        if (color_loc != -1) {
+            glUniform3f(color_loc, 0.0f, 0.8f, 1.0f); // Cyan/blue color for the light cycle
+        }
+
+        int32_t ambient_loc = glGetUniformLocation(light_cycle_shader.ID, "uAmbient");
+        if (ambient_loc != -1) {
+            glUniform1f(ambient_loc, 0.3f);
+        }
+
+        // view matrix
+        view_loc = glGetUniformLocation(light_cycle_shader.ID, "view");
+        if (view_loc != -1) {
+            glUniformMatrix4fv(view_loc, 1, GL_FALSE, glm::value_ptr(view));
+        }
+
+        // projection matrix
+        projection_loc = glGetUniformLocation(light_cycle_shader.ID, "projection");
+        if (projection_loc != -1) {
+            glUniformMatrix4fv(projection_loc, 1, GL_FALSE, glm::value_ptr(projection));
+        }
 
         auto total_time_elapsed =
             std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t0);
