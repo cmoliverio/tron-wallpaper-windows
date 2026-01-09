@@ -23,6 +23,7 @@
 #pragma comment(lib, "Shcore.lib")
 
 #include "shader.hpp"
+#include "bloom_renderer.hpp"
 #include "tetrahedron.hpp"
 #include "capsule.hpp"
 #include "light_cycle.hpp"
@@ -302,12 +303,11 @@ int main()
         spinSpeeds.push_back(glm::radians(spinDeg)); // convert to radians
     }
 
+    BloomRenderer bloom_renderer(width, height);
+
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
     // glCullFace(GL_BACK);
-
-    // glDisable(GL_CULL_FACE);
-    // glDisable(GL_DEPTH_TEST); // temporarily
 
     std::chrono::steady_clock::time_point t1;
     std::chrono::steady_clock::time_point t2;
@@ -315,12 +315,10 @@ int main()
     // light cycle shader
     Shader light_cycle_shader(
         "light_cycle_vertex_shader.vert",
-        // "light_cycle_geometry_shader.geom",
         "light_cycle_fragment_shader.frag");
 
     // create a light cycle here
-    LightCycle first_cycle(glm::vec3(-3.0f, -0.5f, -5.0f));
-
+    LightCycle first_cycle(glm::vec3(1.0f, -0.5f, -5.0f));
 
     glm::mat4 view = glm::mat4(1.0f);
     view = glm::translate(view, glm::vec3(0.0f, 0.0f, -3.0f));
@@ -340,25 +338,21 @@ int main()
         if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
             glfwSetWindowShouldClose(window, true);
 
-        glClearColor(0.08f, 0.10f, 0.13f, 1.0f);
+        glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        normal_shader.use();
+        bloom_renderer.beginScene();
 
+        light_cycle_shader.use();
+
+        light_cycle_shader.setVec3("uColor", glm::vec3(0.14f, 0.8f, 1.0f)); // Cyan
+
+        // view matrix
         view = glm::translate(view, glm::vec3(-0.003f, 0.0f, 0.0f));
-        // view
-        int32_t view_loc = glGetUniformLocation(
-            normal_shader.ID,
-            "view");
-        if (view_loc == -1)
-        {
-            std::cerr << "View uniform not found" << std::endl;
+        int32_t view_loc = glGetUniformLocation(light_cycle_shader.ID, "view");
+        if (view_loc != -1) {
+            glUniformMatrix4fv(view_loc, 1, GL_FALSE, glm::value_ptr(view));
         }
-        glUniformMatrix4fv(
-            view_loc,
-            1,
-            GL_FALSE,
-            glm::value_ptr(view));
 
         // projection
         glm::mat4 projection = glm::perspective(
@@ -367,90 +361,7 @@ int main()
             0.1f,                         // near clipping distance
             100.0f                        // far clipping distance
         );
-        int32_t projection_loc = glGetUniformLocation(
-            normal_shader.ID,
-            "projection");
-        if (projection_loc == -1)
-        {
-            std::cerr << "Projection uniform not found" << std::endl;
-        }
-        glUniformMatrix4fv(
-            projection_loc,
-            1,
-            GL_FALSE,
-            glm::value_ptr(projection));
-
-        for (uint32_t i = 0; i < tetrahedrons.size(); ++i)
-        {
-            // then get the value for that triangle here and make the spin speed
-            tetrahedrons[i].rotate(spinSpeeds[i] * elapsed.count(), spinAxes[i]);
-            tetrahedrons[i].draw(normal_shader, i);
-        }
-
-        // light_cycle_shader.use();
-
-        // // view
-        // // view = glm::mat4(1.0f);
-        // // view = glm::translate(view, glm::vec3(0.0f, 0.0f, -3.0f));
-        // view_loc = glGetUniformLocation(
-        //     light_cycle_shader.ID,
-        //     "view");
-        // if (view_loc == -1)
-        // {
-        //     std::cerr << "View uniform not found" << std::endl;
-        // }
-        // glUniformMatrix4fv(
-        //     view_loc,
-        //     1,
-        //     GL_FALSE,
-        //     glm::value_ptr(view));
-
-        // // projection
-        // projection = glm::perspective(
-        //     glm::radians(45.0f),
-        //     (float)width / (float)height, // not sure what this is tbh
-        //     0.1f,                         // near clipping distance
-        //     100.0f                        // far clipping distance
-        // );
-        // projection_loc = glGetUniformLocation(
-        //     light_cycle_shader.ID,
-        //     "projection");
-        // if (projection_loc == -1)
-        // {
-        //     std::cerr << "Projection uniform not found" << std::endl;
-        // }
-        // glUniformMatrix4fv(
-        //     projection_loc,
-        //     1,
-        //     GL_FALSE,
-        //     glm::value_ptr(projection));
-        light_cycle_shader.use();
-
-        // // Set uniforms for lighting
-        // glm::vec3 lightPosView = glm::vec3(view * glm::vec4(5.0f, 5.0f, 5.0f, 1.0f));
-        // int32_t light_pos_loc = glGetUniformLocation(light_cycle_shader.ID, "uLightPos");
-        // if (light_pos_loc != -1) {
-        //     glUniform3fv(light_pos_loc, 1, glm::value_ptr(lightPosView));
-        // }
-
-        // int32_t color_loc = glGetUniformLocation(light_cycle_shader.ID, "uColor");
-        // if (color_loc != -1) {
-        //     glUniform3f(color_loc, 0.0f, 0.8f, 1.0f); // Cyan/blue color for the light cycle
-        // }
-
-        // int32_t ambient_loc = glGetUniformLocation(light_cycle_shader.ID, "uAmbient");
-        // if (ambient_loc != -1) {
-        //     glUniform1f(ambient_loc, 0.3f);
-        // }
-
-        // view matrix
-        view_loc = glGetUniformLocation(light_cycle_shader.ID, "view");
-        if (view_loc != -1) {
-            glUniformMatrix4fv(view_loc, 1, GL_FALSE, glm::value_ptr(view));
-        }
-
-        // projection matrix
-        projection_loc = glGetUniformLocation(light_cycle_shader.ID, "projection");
+        int32_t projection_loc = glGetUniformLocation(light_cycle_shader.ID, "projection");
         if (projection_loc != -1) {
             glUniformMatrix4fv(projection_loc, 1, GL_FALSE, glm::value_ptr(projection));
         }
@@ -472,7 +383,7 @@ int main()
                 break;
 
             case 1:
-                if (t > 2000) {
+                if (t > 1200) {
                     first_cycle.change_direction(Direction::Forward);
                     turnStage++;
                     first_cycle.print_points();
@@ -521,6 +432,13 @@ int main()
         // start rendering the light cycles here
         first_cycle.move(elapsed.count());
         first_cycle.draw(light_cycle_shader);
+
+        bloom_renderer.renderBloom(bloom_renderer.getBrightTexture());
+    
+        // ========================================
+        // STEP 3: Composite to screen
+        // ========================================
+        bloom_renderer.renderToScreen();
 
         glfwSwapBuffers(window);
         glfwPollEvents();

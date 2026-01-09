@@ -1,59 +1,38 @@
-// #version 330 core
-// #extension GL_ARB_conservative_depth : enable
-// in vec3 fP;
-// in vec3 fA;
-// in vec3 fB;
-
-// out vec4 FragColor;
-
-// uniform float uThickness;
-// uniform vec4 color;
-// uniform mat4 projection;
-
-// vec3 capsuleNormal(vec3 p, vec3 a, vec3 b)
-// {
-//     vec3 pa = p - a;
-//     vec3 ba = b - a;
-//     float h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
-//     vec3 closest = a + ba * h;
-//     return normalize(p - closest);
-// }
-
-// float sdCapsule(vec3 p, vec3 a, vec3 b, float r)
-// {
-//     vec3 pa = p - a;
-//     vec3 ba = b - a;
-//     float h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
-//     return length(pa - ba * h) - r;
-// }
-
-// void main()
-// {
-//     float d = sdCapsule(fP, fA, fB, uThickness);
-//     if (d > 0.0)
-//         discard;
-
-//     // Move point onto capsule surface
-//     vec3 n = capsuleNormal(fP, fA, fB);
-//     vec3 surfacePos = fP - n * d;
-
-//     // Recompute depth
-//     vec4 clip = projection * vec4(surfacePos, 1.0);
-//     float depth = clip.z / clip.w;
-//     gl_FragDepth = depth * 0.5 + 0.5;
-
-//     FragColor = vec4(0.5, 1.0, 1.0, 1.0);
-// }
-
 #version 330 core
+
+layout (location = 0) out vec4 FragColor;
+layout (location = 1) out vec4 BrightColor;
+
 in vec3 vNormal;
 in vec3 vViewPos;
-
 uniform vec3 uColor;
-
-out vec4 FragColor;
 
 void main()
 {
-    FragColor = vec4(0.5, 0.8, 1.0, 1.0);
+    // Use the color passed from the application, multiplied for HDR glow
+    vec3 color = uColor * 3.0; // Multiply by 3 for HDR glow
+    
+    // Enhanced edge-based anti-aliasing using normal
+    // The derivative functions measure how quickly values change across fragments
+    vec3 fdx = dFdx(vViewPos);
+    vec3 fdy = dFdy(vViewPos);
+    vec3 normal = normalize(cross(fdx, fdy));
+    
+    // Calculate edge factor based on view angle
+    // More perpendicular to view = stronger edge = more aliasing
+    float edgeFactor = abs(dot(normalize(vViewPos), normal));
+    edgeFactor = smoothstep(0.0, 0.5, edgeFactor); // Wider smooth transition for more AA
+    
+    // Apply stronger anti-aliasing by more aggressively reducing intensity at steep angles
+    float aaFactor = mix(0.7, 1.0, edgeFactor);
+    color *= aaFactor;
+    
+    FragColor = vec4(color, 1.0);
+    
+    // Extract bright areas based on luminance
+    float brightness = dot(color, vec3(0.2126, 0.7152, 0.0722));
+    if(brightness > 1.0)
+        BrightColor = vec4(color, 1.0);
+    else
+        BrightColor = vec4(0.0, 0.0, 0.0, 1.0);
 }

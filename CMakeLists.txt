@@ -21,6 +21,7 @@ add_executable(tron_wallpaper
     src/light_cycle.cpp
     src/capsule.cpp
     src/wallpaper_utils.cpp
+    src/bloom_renderer.cpp
 )
 
 target_include_directories(tron_wallpaper
