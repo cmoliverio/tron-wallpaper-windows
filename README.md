@@ -7,7 +7,7 @@ generate light cycle traces just like in the `TRON: Legacy` movie intro.
 
 ### Requirements
 
-- Windows 10 or 11 
+- Windows 10 or 11 (64-bit only)
 - MSVC Compiler 19.38+
 - Choco installer 
 - BASH shell (I prefer Git BASH)
@@ -28,12 +28,11 @@ $ choco install cmake
 $ git clone https://github.com/microsoft/vcpkg.git
 $ cd vcpkg
 $ ./bootstrap-vcpkg.sh
-$ ./vcpkg install glfw3 glad glm
+$ ./vcpkg install glfw3:x64-windows-static glm:x64-windows-static glad:x64-windows-static
 ```
 
 3. Get the CMAKE_TOOLCHAIN_FILE from vcpkg
 ```
-$ cd <vcpkg_dir>
 $ ./vcpkg.exe integrate install
 
 # should see an output something like '-DCMAKE_TOOLCHAIN_FILE=<some_dir>'
@@ -49,5 +48,6 @@ $ ./tron_wallpaper.exe
 
 Quick build and run:
 ```
-cmake --build build && ./tron_wallpaper.exe
+cmake --build build --config Release && ./tron_wallpaper.exe
+
 ```

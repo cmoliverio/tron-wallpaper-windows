@@ -22,8 +22,7 @@ fi
 # run cmake using the env var
 cmake -B build \
   -DCMAKE_TOOLCHAIN_FILE="$CMAKE_TOOLCHAIN_FILE" \
+  -DVCPKG_TARGET_TRIPLET=x64-windows-static \
   .
 
-cmake -B build
-
-cmake --build build --config Debug
+cmake --build build --config Release
