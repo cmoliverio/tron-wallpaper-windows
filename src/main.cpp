@@ -4,6 +4,7 @@
 #include <GLFW/glfw3native.h>
 #include <iostream>
 #include <algorithm>
+#include <filesystem>
 #include <chrono>
 #include <thread>
 #include <cmath>
@@ -22,6 +23,7 @@
 #include <shlwapi.h>
 #pragma comment(lib, "Shcore.lib")
 
+#include "config.hpp"
 #include "shader.hpp"
 #include "bloom_renderer.hpp"
 #include "tetrahedron.hpp"
@@ -231,22 +233,35 @@ int main()
     init_os();
 
     // get (main) monitor dimensions
-    uint32_t width = 1800;
-    uint32_t height = 720;
-    // uint32_t width  = GetSystemMetrics(SM_CXSCREEN);
-    // uint32_t height = GetSystemMetrics(SM_CYSCREEN);
+    // uint32_t width = 1800;
+    // uint32_t height = 720;
+    uint32_t width  = GetSystemMetrics(SM_CXSCREEN);
+    uint32_t height = GetSystemMetrics(SM_CYSCREEN);
 
     GLFWwindow *window = init_glfw_window(width, height);
+    GLFWwindow* control_window = nullptr;
 
     // get the windows handle
-    // HWND hwnd = glfwGetWin32Window(window);
-    // if (!hwnd) {
-    //     std::cerr << "Could not get Windows handle from GLFW" << std::endl;
-    //     std::exit(-1);
-    // }
+    HWND hwnd = glfwGetWin32Window(window);
+    if (!hwnd) {
+        std::cerr << "Could not get Windows handle from GLFW" << std::endl;
+        std::exit(-1);
+    }
 
     // set as background
-    // attach_wallpaper_to_os(hwnd, width, height);
+    attach_wallpaper_to_os(hwnd, width, height);
+
+    Config config;
+    config.load("tron_config.ini");
+
+    // File watcher setup
+    std::filesystem::file_time_type last_modified;
+    try {
+        last_modified = std::filesystem::last_write_time("tron_config.ini");
+    } catch (std::filesystem::filesystem_error&) {
+        // File doesn't exist yet, that's okay
+        last_modified = std::filesystem::file_time_type::min();
+    }
 
     Shader normal_shader(
         "vertex_shader.vert",
@@ -329,11 +344,25 @@ int main()
     // Render loop
     while (!glfwWindowShouldClose(window))
     {
+        try {
+            auto current_modified = std::filesystem::last_write_time("tron_config.ini");
+            if (current_modified != last_modified) {
+                std::cout << "Config file changed, reloading...\n";
+                config.load("tron_config.ini");
+                last_modified = current_modified;
+            }
+        } catch (std::filesystem::filesystem_error& e) {
+            // File might have been deleted temporarily, ignore
+        }
+
         // measure time
         t2 = std::chrono::steady_clock::now();
 
-        auto elapsed =
+        auto elapsed_time =
             std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1);
+        
+        // multiple elapsed time by simulation speed
+        float elapsed = config.simulation_speed * (float) elapsed_time.count();
 
         if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
             glfwSetWindowShouldClose(window, true);
@@ -345,7 +374,8 @@ int main()
 
         light_cycle_shader.use();
 
-        light_cycle_shader.setVec3("uColor", glm::vec3(0.14f, 0.8f, 1.0f)); // Cyan
+        light_cycle_shader.setVec3("uColor", glm::vec3(
+            config.color_red, config.color_green, config.color_blue));
 
         // view matrix
         view = glm::translate(view, glm::vec3(-0.003f, 0.0f, 0.0f));
@@ -430,7 +460,7 @@ int main()
         }
 
         // start rendering the light cycles here
-        first_cycle.move(elapsed.count());
+        first_cycle.move(elapsed);
         first_cycle.draw(light_cycle_shader);
 
         bloom_renderer.renderBloom(bloom_renderer.getBrightTexture());

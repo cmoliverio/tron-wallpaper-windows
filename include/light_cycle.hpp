@@ -34,7 +34,7 @@ public:
     void change_direction(Direction d);
     void change_direction_random();
 
-    void move(uint64_t elapsed_ms);
+    void move(float elapsed_ms);
     void draw(Shader& shader) const;
     void print_points();
 

@@ -58,7 +58,7 @@ void LightCycle::change_direction_random()
     change_direction(static_cast<Direction>(dist(rng)));
 }
 
-void LightCycle::move(uint64_t elapsed_ms)
+void LightCycle::move(float elapsed_ms)
 {
     glm::vec3& head = points.back();
     glm::vec3 tail = points[points.size() - 2];
