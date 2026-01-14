@@ -14,8 +14,8 @@ public:
     
     void resize(unsigned int width, unsigned int height);
     void beginScene();
-    void renderBloom(unsigned int srcTexture);
-    void renderToScreen();
+    void renderBloom(unsigned int srcTexture, float filterRadiusMultiplier);
+    void renderToScreen(float bloomStrengthMultiplier);
     
     unsigned int getSceneTexture() const { return mHdrColorBuffer; }
     unsigned int getBrightTexture() const { return mHdrBrightBuffer; }

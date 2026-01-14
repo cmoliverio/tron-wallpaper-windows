@@ -16,10 +16,12 @@ void LightCycle::print_points()
     // }
 }
 
-LightCycle::LightCycle(const glm::vec3& startPos, float s)
+LightCycle::LightCycle(const glm::vec3& startPos, float thicknessMultiplier, 
+    float s)
     : direction(direction_vector(Direction::Right)),
       speed(s),
-      distance_since_last(0.0f)
+      distance_since_last(0.0f),
+      thickness(0.02f * thicknessMultiplier)  // Override the default value
 {
     points.push_back(startPos);
     points.push_back(startPos + (direction * speed));

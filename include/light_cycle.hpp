@@ -29,7 +29,8 @@ inline glm::vec3 direction_vector(Direction d) {
 
 class LightCycle {
 public:
-    explicit LightCycle(const glm::vec3& startPos, float speed = 0.0015f);
+    explicit LightCycle(const glm::vec3& startPos, float thicknessMultiplier,
+        float speed = 0.0015f);
 
     void change_direction(Direction d);
     void change_direction_random();

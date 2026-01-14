@@ -2,6 +2,8 @@
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 #include <GLFW/glfw3.h>
+#include <chrono>
+#include <thread>
 #include <iostream>
 #include "Config.hpp"
 
@@ -106,7 +108,7 @@ int main() {
         ImGui::Text("SPEED SETTINGS");
         ImGui::Separator();
         
-        if (ImGui::SliderFloat("Simulation Speed", &config.simulation_speed, 0.1f, 10.0f, "%.1fx")) {
+        if (ImGui::SliderFloat("Simulation Speed", &config.simulation_speed, 0.1f, 3.0f, "%.1fx")) {
             changed = true;
         }
         if (ImGui::SliderFloat("Cycle Speed", &config.cycle_speed, 0.1f, 10.0f, "%.1fx")) {
@@ -167,6 +169,8 @@ int main() {
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
         glfwSwapBuffers(window);
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(16));
     }
 
     // Cleanup

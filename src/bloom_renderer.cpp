@@ -142,7 +142,8 @@ void BloomRenderer::beginScene() {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 }
 
-void BloomRenderer::renderBloom(unsigned int srcTexture) {
+void BloomRenderer::renderBloom(unsigned int srcTexture, 
+    float filterRadiusMultiplier) {
     // Downsample
     mDownsampleShader->use();
     mDownsampleShader->setInt("srcTexture", 0);
@@ -170,7 +171,7 @@ void BloomRenderer::renderBloom(unsigned int srcTexture) {
     // Upsample
     mUpsampleShader->use();
     mUpsampleShader->setInt("srcTexture", 0);
-    mUpsampleShader->setFloat("filterRadius", mFilterRadius);
+    mUpsampleShader->setFloat("filterRadius", mFilterRadius * filterRadiusMultiplier);
     
     glEnable(GL_BLEND);
     glBlendFunc(GL_ONE, GL_ONE);
@@ -194,14 +195,14 @@ void BloomRenderer::renderBloom(unsigned int srcTexture) {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
-void BloomRenderer::renderToScreen() {
+void BloomRenderer::renderToScreen(float bloomStrengthMultiplier) {
     glViewport(0, 0, mWidth, mHeight);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     
     mCompositeShader->use();
     mCompositeShader->setInt("sceneTexture", 0);
     mCompositeShader->setInt("bloomTexture", 1);
-    mCompositeShader->setFloat("bloomStrength", mBloomStrength);
+    mCompositeShader->setFloat("bloomStrength", mBloomStrength * bloomStrengthMultiplier);
     
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, mHdrColorBuffer);

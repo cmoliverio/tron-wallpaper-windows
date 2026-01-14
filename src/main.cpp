@@ -230,26 +230,26 @@ glm::vec3 randomUnitAxis()
 int main()
 {
     // prepare Windows
-    init_os();
+    // init_os();
 
     // get (main) monitor dimensions
-    // uint32_t width = 1800;
-    // uint32_t height = 720;
-    uint32_t width  = GetSystemMetrics(SM_CXSCREEN);
-    uint32_t height = GetSystemMetrics(SM_CYSCREEN);
+    uint32_t width = 1260;
+    uint32_t height = 720;
+    // uint32_t width  = GetSystemMetrics(SM_CXSCREEN);
+    // uint32_t height = GetSystemMetrics(SM_CYSCREEN);
 
     GLFWwindow *window = init_glfw_window(width, height);
     GLFWwindow* control_window = nullptr;
 
     // get the windows handle
-    HWND hwnd = glfwGetWin32Window(window);
-    if (!hwnd) {
-        std::cerr << "Could not get Windows handle from GLFW" << std::endl;
-        std::exit(-1);
-    }
+    // HWND hwnd = glfwGetWin32Window(window);
+    // if (!hwnd) {
+    //     std::cerr << "Could not get Windows handle from GLFW" << std::endl;
+    //     std::exit(-1);
+    // }
 
     // set as background
-    attach_wallpaper_to_os(hwnd, width, height);
+    // attach_wallpaper_to_os(hwnd, width, height);
 
     Config config;
     config.load("tron_config.ini");
@@ -322,7 +322,6 @@ int main()
 
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
-    // glCullFace(GL_BACK);
 
     std::chrono::steady_clock::time_point t1;
     std::chrono::steady_clock::time_point t2;
@@ -333,7 +332,7 @@ int main()
         "light_cycle_fragment_shader.frag");
 
     // create a light cycle here
-    LightCycle first_cycle(glm::vec3(1.0f, -0.5f, -5.0f));
+    LightCycle first_cycle(glm::vec3(1.0f, 0.5f, -5.0f), config.thickness);
 
     glm::mat4 view = glm::mat4(1.0f);
     view = glm::translate(view, glm::vec3(0.0f, 0.0f, -3.0f));
@@ -377,8 +376,13 @@ int main()
         light_cycle_shader.setVec3("uColor", glm::vec3(
             config.color_red, config.color_green, config.color_blue));
 
+        float camera_move_speed = -0.001f;
+        float cam_speed = camera_move_speed * elapsed;
+
+        first_cycle.thickness = 0.02f * config.thickness;
+
         // view matrix
-        view = glm::translate(view, glm::vec3(-0.003f, 0.0f, 0.0f));
+        view = glm::translate(view, glm::vec3(cam_speed, 0.0f, 0.0f));
         int32_t view_loc = glGetUniformLocation(light_cycle_shader.ID, "view");
         if (view_loc != -1) {
             glUniformMatrix4fv(view_loc, 1, GL_FALSE, glm::value_ptr(view));
@@ -413,7 +417,7 @@ int main()
                 break;
 
             case 1:
-                if (t > 1200) {
+                if (t > 2000) {
                     first_cycle.change_direction(Direction::Forward);
                     turnStage++;
                     first_cycle.print_points();
@@ -463,19 +467,20 @@ int main()
         first_cycle.move(elapsed);
         first_cycle.draw(light_cycle_shader);
 
-        bloom_renderer.renderBloom(bloom_renderer.getBrightTexture());
+        bloom_renderer.renderBloom(bloom_renderer.getBrightTexture(), 
+            config.bloom_distance);
     
         // ========================================
         // STEP 3: Composite to screen
         // ========================================
-        bloom_renderer.renderToScreen();
+        bloom_renderer.renderToScreen(config.bloom_power);
 
         glfwSwapBuffers(window);
         glfwPollEvents();
 
         t1 = t2;
 
-	std::this_thread::sleep_for(std::chrono::milliseconds(8));
+        std::this_thread::sleep_for(std::chrono::milliseconds(8));
     }
 
     glfwDestroyWindow(window);
