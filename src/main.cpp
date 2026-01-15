@@ -375,6 +375,10 @@ int main()
 
         light_cycle_shader.setVec3("uColor", glm::vec3(
             config.color_red, config.color_green, config.color_blue));
+        light_cycle_shader.setFloat("uHdrMultiplier", config.hdr_multiplier);      // e.g., 3.0
+        light_cycle_shader.setFloat("uEdgeSmoothing", config.edge_smoothing);      // e.g., 0.5
+        light_cycle_shader.setVec2("uAaMix", 
+            glm::vec2(config.antialiasing_min, config.antialiasing_max));
 
         float camera_move_speed = -0.001f;
         float cam_speed = camera_move_speed * elapsed;

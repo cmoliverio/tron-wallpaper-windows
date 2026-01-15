@@ -21,7 +21,7 @@ int main() {
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
     // Create window
-    GLFWwindow* window = glfwCreateWindow(450, 650, "MCP - Master Control Program", nullptr, nullptr);
+    GLFWwindow* window = glfwCreateWindow(450, 800, "MCP - Master Control Program", nullptr, nullptr);
     if (!window) {
         std::cerr << "Failed to create GLFW window\n";
         glfwTerminate();
@@ -69,7 +69,7 @@ int main() {
 
         // Create main control window
         ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
-        ImGui::SetNextWindowSize(ImVec2(450, 650), ImGuiCond_Always);
+        ImGui::SetNextWindowSize(ImVec2(450, 800), ImGuiCond_Always);
         ImGui::Begin("MASTER CONTROL PROGRAM", nullptr, 
             ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse);
 
@@ -125,13 +125,40 @@ int main() {
         if (ImGui::SliderFloat("Thickness", &config.thickness, 0.1f, 3.0f, "%.2f")) {
             changed = true;
         }
-        if (ImGui::SliderFloat("Bloom Power", &config.bloom_power, 0.1f, 10.0f, "%.1f")) {
+        if (ImGui::SliderFloat("Bloom Power", &config.bloom_power, 0.1f, 30.0f, "%.1f")) {
             changed = true;
         }
         if (ImGui::SliderFloat("Bloom Distance", &config.bloom_distance, 0.1f, 10.0f, "%.1f")) {
             changed = true;
         }
         if (ImGui::SliderFloat("Bloom Flicker", &config.bloom_flicker_intensity, 0.0f, 1.0f, "%.2f")) {
+            changed = true;
+        }
+
+        ImGui::Spacing();
+        ImGui::Text("ADVANCED RENDERING");
+        ImGui::Separator();
+        
+        if (ImGui::SliderFloat("HDR Multiplier", &config.hdr_multiplier, 0.1f, 20.0f, "%.2f")) {
+            changed = true;
+        }
+        if (ImGui::SliderFloat("Edge Smoothing", &config.edge_smoothing, 0.1f, 1.0f, "%.2f")) {
+            changed = true;
+        }
+        
+        // Anti-aliasing min/max with validation
+        if (ImGui::SliderFloat("AA Min (edges)", &config.antialiasing_min, 0.1f, 1.0f, "%.2f")) {
+            // Ensure min doesn't exceed max
+            if (config.antialiasing_min > config.antialiasing_max) {
+                config.antialiasing_max = config.antialiasing_min;
+            }
+            changed = true;
+        }
+        if (ImGui::SliderFloat("AA Max (faces)", &config.antialiasing_max, 0.1f, 1.0f, "%.2f")) {
+            // Ensure max doesn't go below min
+            if (config.antialiasing_max < config.antialiasing_min) {
+                config.antialiasing_min = config.antialiasing_max;
+            }
             changed = true;
         }
 
